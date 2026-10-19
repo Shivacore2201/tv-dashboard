@@ -535,7 +535,8 @@
     // Brand wordmark first; if the TV gives us the app's real icon, it covers the card like on Apple TV.
     var lab = label();
     card.appendChild(lab);
-    if (t.icon) {
+    // Apps we have a proper logo for keep it: the TV hands some of them a generic pinwheel icon.
+    if (t.icon && !(brand && LOGOS[brand[0]])) {
       var img = new Image();
       img.onload = function () {
         var art = document.createElement('div'); art.className = 'art';
