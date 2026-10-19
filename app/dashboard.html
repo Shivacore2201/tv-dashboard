@@ -196,20 +196,53 @@
     { match: ['prime video'], name: 'Prime Video', color: '#00a8e1', ids: ['3201910019365'] },
     { match: ['jiohotstar', 'hotstar'], name: 'JioHotstar', color: '#2b3bbf', ids: [] },
     { match: ['apple tv'], name: 'Apple TV', color: '#3a3a3c', ids: ['3201807016597'] },
-    { match: ['aha'], name: 'aha', color: '#f26a21', ids: [] },
-    { match: ['zee5'], name: 'ZEE5', color: '#7b2590', ids: [] },
-    { match: ['sony liv', 'sonyliv'], name: 'Sony LIV', color: '#444', ids: [] },
     { match: ['youtube'], name: 'YouTube', color: '#cc0000', ids: ['111299001912'] }
   ];
+  // Same order as the Samsung app bar, so the bottom row feels familiar.
+  var ORDER = ['samsung tv plus', 'apple music', 'ottplay', 'netflix', 'mx player', 'prime video', 'hotstar', 'apple tv',
+    'youtube', 'aha', 'zee5', 'glance', 'gallery', 'internet', 'spotify', 'sony liv', 'sonyliv', 'viki', 'etv win'];
+  // Each app drawn in its own colours, like its icon on the Samsung app bar. If the TV hands us the real icon, that wins.
+  var BRANDS = [
+    ['tizentube', 'linear-gradient(145deg,#ff2d2d,#b00000)', '#fff', '\u25B6 TizenTube', 'font-weight:800'],
+    ['netflix', '#000', '#e50914', 'NETFLIX', 'font-weight:900;letter-spacing:3px'],
+    ['prime video', 'linear-gradient(145deg,#1ab7ea,#0a6fb5)', '#fff', 'prime video', 'font-weight:800;text-transform:lowercase'],
+    ['hotstar', 'linear-gradient(135deg,#0c1f6e,#6a1fd1 55%,#d41f8c)', '#fff', 'JioHotstar', 'font-weight:700'],
+    ['apple tv', '#000', '#fff', 'Apple TV', 'font-weight:500;letter-spacing:1px'],
+    ['apple music', 'linear-gradient(145deg,#fb5c74,#fa233b)', '#fff', '\u266B Music', 'font-weight:600'],
+    ['youtube', '#fff', '#111', '<b style="color:#f00">\u25B6</b> YouTube', 'font-weight:700'],
+    ['aha', 'linear-gradient(145deg,#ff8a1f,#f2541b)', '#fff', 'aha', 'font-weight:900;letter-spacing:1px'],
+    ['zee5', 'linear-gradient(145deg,#2a0b4a,#0d0418)', '#fff', 'ZEE5', 'font-weight:900;letter-spacing:2px'],
+    ['sony liv', 'linear-gradient(145deg,#111,#2a2a2a)', '#f5b800', 'SONY LIV', 'font-weight:800'],
+    ['sonyliv', 'linear-gradient(145deg,#111,#2a2a2a)', '#f5b800', 'SONY LIV', 'font-weight:800'],
+    ['spotify', '#1db954', '#000', 'Spotify', 'font-weight:800'],
+    ['viki', 'linear-gradient(145deg,#2aa7ff,#0a7ed8)', '#fff', 'Viki', 'font-weight:900'],
+    ['samsung tv plus', 'linear-gradient(145deg,#14234d,#0a1128)', '#fff', 'TV Plus', 'font-weight:700'],
+    ['mx player', 'linear-gradient(145deg,#2b7bff,#0a4fd1)', '#fff', 'MX Player', 'font-weight:800'],
+    ['ottplay', 'linear-gradient(145deg,#2a1a7a,#120a40)', '#fff', 'OTTplay', 'font-weight:800'],
+    ['etv win', 'linear-gradient(145deg,#ff2a2a,#c4000c)', '#fff', 'ETV Win', 'font-weight:900'],
+    ['glance', 'linear-gradient(145deg,#ff3fa4,#a12cff)', '#fff', 'glance tv', 'font-weight:800'],
+    ['gallery', 'linear-gradient(145deg,#ff5f6d,#ffc371)', '#fff', '\u273F Gallery', 'font-weight:700'],
+    ['internet', 'linear-gradient(145deg,#5a7bff,#2c3fd6)', '#fff', 'Internet', 'font-weight:700']
+  ];
+  function brandOf(name) {
+    var n = lc(name);
+    for (var i = 0; i < BRANDS.length; i++) if (n.indexOf(BRANDS[i][0]) !== -1) return BRANDS[i];
+    return null;
+  }
+  function orderOf(name) {
+    var n = lc(name);
+    for (var i = 0; i < ORDER.length; i++) if (n.indexOf(ORDER[i]) !== -1) return i;
+    return ORDER.length;
+  }
   var PALETTE = ['#3a5bd9', '#8a3ad9', '#1aa6b7', '#d9573a', '#2f9e5b', '#c23a7a', '#5a6b8c', '#b7891a'];
   // Hidden Samsung system parts that show up in the TV's app list.
-  var SYSTEM = ['widget', 'popup', 'service', 'adplayer', 'agingapp', 'survey', 'framework', 'aria video', 'bixby', 'alexa'];
+  var SYSTEM = ['widget', 'popup', 'service', 'adplayer', 'agingapp', 'survey', 'framework', 'aria video', 'bixby', 'alexa', 'ok google', 'google assistant'];
   function isSystem(a) {
     // Names like "bnr-service" or "csfw_agent" are internal parts, not apps people open.
     return contains(a.name, SYSTEM) || /^[a-z0-9]+([-_.][a-z0-9]+)+$/.test(a.name || '') ||
       /^apps?$/i.test(a.name || '');
   }
-  var HIDE = ['tizentube', 'web browser', 'internet', 'gallery', 'samsung promotion', 'universal guide', 'dashboard', 'e-manual', 'smartthings'];
+  var HIDE = ['tizentube', 'samsung promotion', 'universal guide', 'dashboard', 'e-manual', 'smartthings'];
   var THEMES = [['', 'Midnight'], ['t-aurora', 'Aurora'], ['t-sunset', 'Sunset'], ['t-ocean', 'Ocean'], ['t-gold', 'Gold'], ['t-mono', 'Mono'], ['t-photo', 'Photo']];
   var IDLE_MS = 3 * 60 * 1000;
   var PHOTO_MS = 20 * 1000;
@@ -438,7 +471,10 @@
     var rest = apps.filter(function (a) {
       return !used[a.id] && !contains(a.name, HIDE) && !isSystem(a) && !/dummy/i.test(a.id);
     });
-    rest.sort(function (a, b) { return lc(a.name) < lc(b.name) ? -1 : 1; });
+    rest.sort(function (a, b) {
+      var d = orderOf(a.name) - orderOf(b.name);
+      return d || (lc(a.name) < lc(b.name) ? -1 : 1);
+    });
     rest.forEach(function (a, i) {
       rows[1].push({ name: a.name, color: PALETTE[i % PALETTE.length], ids: [a.id], icon: a.iconPath });
     });
@@ -451,13 +487,17 @@
     el.style.webkitAnimationDelay = el.style.animationDelay = delay + 's';
     var card = document.createElement('div');
     card.className = 'card';
-    card.style.background = 'linear-gradient(145deg, ' + t.color + ' 0%, rgba(0,0,0,.6) 120%)';
+    var brand = brandOf(t.name);
+    card.style.background = brand ? brand[1] : 'linear-gradient(145deg, ' + t.color + ' 0%, rgba(0,0,0,.6) 120%)';
     el.appendChild(card);
     var label = function () {
       var n = document.createElement('div'); n.className = 'name';
-      var s = document.createElement('span'); s.textContent = t.name; n.appendChild(s); return n;
+      var s = document.createElement('span');
+      if (brand) { s.innerHTML = brand[3]; s.style.cssText = 'color:' + brand[2] + ';text-shadow:none;' + brand[4]; }
+      else s.textContent = t.name;
+      n.appendChild(s); return n;
     };
-    // Name first; if the app's own artwork loads, it covers the card like on Apple TV.
+    // Brand wordmark first; if the TV gives us the app's real icon, it covers the card like on Apple TV.
     card.appendChild(label());
     if (t.icon) {
       var img = new Image();
