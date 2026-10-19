@@ -164,7 +164,7 @@
     <div id="date"></div>
     <div id="greet"></div>
     <div id="weather"><div id="wtemp"></div><div id="wdesc"></div><div id="wrange"></div><div id="wplace"></div></div>
-    <div id="btns"><div id="saverBtn" class="pill">&#9654; Screensaver</div><div id="themeBtn" class="pill"><span class="dot"></span><span id="themeName">Theme</span></div></div>
+    <div id="btns"><div id="saverBtn" class="pill">&#9654; Screensaver</div><div id="themeBtn" class="pill"><span class="dot"></span><span id="themeName">Theme</span></div><div id="setBtn" class="pill">&#9881; Settings</div></div>
   </div>
 
   <div class="label rise" id="l1" style="-webkit-animation-delay:.15s;animation-delay:.15s">FAVOURITES</div>
@@ -503,8 +503,9 @@
   function focus(r, c) {
     var old = pos.r === -1 ? null : rows[pos.r][pos.c];
     if (old && old.el) old.el.className = 'tile';
-    $('saverBtn').className = $('themeBtn').className = 'pill';
-    if (r === -1) { c = Math.max(0, Math.min(1, c)); pos = { r: -1, c: c }; $(c ? 'themeBtn' : 'saverBtn').className = 'pill focus'; setHint(); return; }
+    var pills = ['saverBtn', 'themeBtn', 'setBtn'];
+    pills.forEach(function (id) { $(id).className = 'pill'; });
+    if (r === -1) { c = Math.max(0, Math.min(pills.length - 1, c)); pos = { r: -1, c: c }; $(pills[c]).className = 'pill focus'; setHint(); return; }
     if (!rows[r].length) return;
     c = Math.max(0, Math.min(c, rows[r].length - 1));
     pos = { r: r, c: c };
@@ -564,6 +565,12 @@
       setTimeout(function () { location.href = mod.appPath; }, 400);
     };
   }
+  // Settings: go back to TizenBrew's own menu (modules, settings, autolaunch) that opened this dashboard.
+  function openTizenBrewMenu() {
+    if (!inTizenBrew) { toast('Settings open TizenBrew\'s menu on the TV'); return; }
+    if (history.length > 1) { history.back(); return; }
+    toast('Open TizenBrew from Home and press UP while it starts to reach its menu');
+  }
   function launchHere(t) {
     if (!hasTizen) { toast(location.protocol === 'file:' ? 'Would open ' + t.name : t.name + ' can\'t be opened from inside TizenBrew'); return; }
     var ids = t.ids.slice();
@@ -604,6 +611,7 @@
       case 40: if (pos.r === -1) focus(0, 0); else if (pos.r === 0 && rows[1].length) focus(1, Math.round(pos.c * 380 / 290)); break;
       case 13:
         if (pos.r === -1 && pos.c === 0) { startSaver(true); break; }
+        if (pos.r === -1 && pos.c === 2) { openTizenBrewMenu(); break; }
         if (pos.r === -1) { applyTheme(themeIdx + 1, true); setTimeout(setHint, 500); }
         else launch(rows[pos.r][pos.c]);
         break;
