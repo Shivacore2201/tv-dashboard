@@ -97,10 +97,10 @@
   body.simple #l1 { top: 470px; }
   body.simple #r1 { top: 535px; height: 330px; }
   body.simple #r1 .tile { width: 520px; height: 293px; }
-  body.simple #r1 .name span { font-size: 60px; }
-  /* Night: everything a little dimmer and warmer, easier on the eyes. */
+  body.simple #r1 .name > span { font-size: 60px; }
+  /* Dim: only when the Dim button is switched on. */
   #night { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0;
-    background: rgba(20,8,0,.35); -webkit-transition: opacity 3s; transition: opacity 3s; }
+    background: rgba(0,0,0,.45); -webkit-transition: opacity .6s; transition: opacity .6s; }
   body.night #night { opacity: 1; }
   .badge { position: absolute; left: 16px; top: 14px; padding: 5px 14px; border-radius: 20px; font-size: 20px; font-weight: 700;
     background: rgba(255,255,255,.92); color: #111; z-index: 2; }
@@ -117,11 +117,18 @@
   #r2 .card { border-radius: 22px; }
   .tile.focus .card { -webkit-transform: scale(1.13); transform: scale(1.13);
     box-shadow: 0 34px 70px rgba(0,0,0,.65), 0 0 0 5px var(--accent), 0 0 50px rgba(var(--c1),.6); }
-  .tile:not(.focus) .card { opacity: .88; }
+  /* Glass: the brand colour is a see-through layer so the wallpaper shows through, with a bright rim and shine. */
+  .card { background: rgba(255,255,255,.07); }
+  .bgl { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: .62;
+    -webkit-transition: opacity .3s; transition: opacity .3s; }
+  .tile.focus .bgl { opacity: .9; }
+  .rim { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: inherit;
+    border: 2px solid rgba(255,255,255,.28); border-bottom-color: rgba(255,255,255,.08); }
+  .tile.focus .rim { border-color: rgba(255,255,255,.55); border-bottom-color: rgba(255,255,255,.15); }
   .name { position: absolute; top: 0; left: 0; display: table; width: 100%; height: 100%; }
-  .name span { display: table-cell; vertical-align: middle; text-align: center; font-weight: 700; padding: 0 20px; white-space: normal; text-shadow: 0 2px 10px rgba(0,0,0,.35); }
-  #r1 .name span { font-size: 44px; }
-  #r2 .name span { font-size: 32px; }
+  .name > span { display: table-cell; vertical-align: middle; text-align: center; font-weight: 700; padding: 0 20px; white-space: normal; text-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  #r1 .name > span { font-size: 44px; }
+  #r2 .name > span { font-size: 32px; }
   .card img { position: absolute; left: 50%; top: 46%; width: 96px; height: 96px; margin: -48px 0 0 -48px; }
   .cap { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 22px; font-weight: 600; }
   .art { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
@@ -130,7 +137,7 @@
   #r2 .under { font-size: 22px; margin-top: 16px; }
   .tile.focus .under { opacity: 1; }
   .gloss { position: absolute; left: 0; right: 0; top: 0; height: 55%;
-    background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0)); }
+    background: linear-gradient(180deg, rgba(255,255,255,.26) 0%, rgba(255,255,255,.06) 60%, rgba(255,255,255,0) 100%); }
   /* light sweep across the card when it gets focus */
   .sweep { position: absolute; top: -20%; left: 0; width: 45%; height: 140%; opacity: 0;
     background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 100%);
@@ -176,7 +183,7 @@
     <div id="date"></div>
     <div id="greet"></div>
     <div id="weather"><div id="wtemp"></div><div id="wdesc"></div><div id="wrange"></div><div id="wplace"></div></div>
-    <div id="btns"><div id="saverBtn" class="pill">&#9654; Screensaver</div><div id="themeBtn" class="pill"><span class="dot"></span><span id="themeName">Theme</span></div><div id="simpleBtn" class="pill">&#9635; Simple</div><div id="setBtn" class="pill">&#9881; Settings</div></div>
+    <div id="btns"><div id="saverBtn" class="pill">&#9654; Screensaver</div><div id="themeBtn" class="pill"><span class="dot"></span><span id="themeName">Theme</span></div><div id="simpleBtn" class="pill">&#9635; Simple</div><div id="dimBtn" class="pill">&#9681; Dim</div><div id="setBtn" class="pill">&#9881; Settings</div></div>
   </div>
 
   <div class="label rise" id="l1" style="-webkit-animation-delay:.15s;animation-delay:.15s">FAVOURITES</div>
@@ -215,11 +222,13 @@
   var ORDER = ['samsung tv plus', 'apple music', 'ottplay', 'netflix', 'mx player', 'prime video', 'hotstar', 'apple tv',
     'youtube', 'aha', 'zee5', 'glance', 'gallery', 'internet', 'spotify', 'sony liv', 'sonyliv', 'viki', 'etv win'];
   // Each app drawn in its own colours, like its icon on the Samsung app bar. If the TV hands us the real icon, that wins.
+  // Current official logos drawn as vector shapes, so they stay sharp and need no download.
+  var LOGOS = { "netflix": "<svg viewBox=\"0 0 24 24\" style=\"height:1.9em;width:1.9em;vertical-align:middle\"><path fill=\"#e50914\" d=\"m5.398 0 8.348 23.602c2.346.059 4.856.398 4.856.398L10.113 0H5.398zm8.489 0v9.172l4.715 13.33V0h-4.715zM5.398 1.5V24c1.873-.225 2.81-.312 4.715-.398V14.83L5.398 1.5z\"/></svg>", "apple tv": "<svg viewBox=\"0 0 24 24\" style=\"height:1.7em;width:1.7em;vertical-align:middle\"><path fill=\"#fff\" d=\"M20.57 17.735h-1.815l-3.34-9.203h1.633l2.02 5.987c.075.231.273.9.586 2.012l.297-.997.33-1.006 2.094-6.004H24zm-5.344-.066a5.76 5.76 0 0 1-1.55.207c-1.23 0-1.84-.693-1.84-2.087V9.646h-1.063V8.532h1.121V7.081l1.476-.602v2.062h1.707v1.113H13.38v5.805c0 .446.074.75.214.932.14.182.396.264.75.264.207 0 .495-.041.883-.115zm-7.29-5.343c.017 1.764 1.55 2.358 1.567 2.366-.017.042-.248.842-.808 1.658-.487.71-.99 1.418-1.79 1.435-.783.016-1.03-.462-1.93-.462-.89 0-1.17.445-1.913.478-.758.025-1.344-.775-1.838-1.484-.998-1.451-1.765-4.098-.734-5.88.51-.89 1.426-1.451 2.416-1.46.75-.016 1.468.512 1.93.512.461 0 1.327-.627 2.234-.536.38.016 1.452.157 2.136 1.154-.058.033-1.278.743-1.27 2.219M6.468 7.988c.404-.495.685-1.18.61-1.864-.585.025-1.294.388-1.723.883-.38.437-.71 1.138-.619 1.806.652.05 1.328-.338 1.732-.825Z\"/></svg>", "youtube": "<span style=\"white-space:nowrap\"><svg viewBox=\"0 0 24 24\" style=\"height:1.15em;width:1.15em;vertical-align:middle\"><path fill=\"#ff0000\" d=\"M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z\"/></svg><span style=\"vertical-align:middle;margin-left:.18em;color:#0f0f0f;font-weight:700;letter-spacing:-1px\">YouTube</span></span>", "prime video": "<span style=\"display:block;color:#fff;font-weight:800;letter-spacing:-.5px;line-height:1\">prime video</span><svg viewBox=\"0 0 120 22\" style=\"display:block;margin:.02em auto 0;width:3.6em;height:.66em\"><path d=\"M6 4 Q60 26 110 6\" fill=\"none\" stroke=\"#1a98ff\" stroke-width=\"5\" stroke-linecap=\"round\"/><path d=\"M98 2 L114 4 L106 17\" fill=\"none\" stroke=\"#1a98ff\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "hotstar": "<span style=\"white-space:nowrap\"><svg viewBox=\"0 0 24 24\" style=\"height:.9em;width:.9em;vertical-align:-.08em;margin-right:.12em\"><defs><linearGradient id=\"jhs\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#ff3ea5\"/><stop offset=\".5\" stop-color=\"#8a3dff\"/><stop offset=\"1\" stop-color=\"#2d8cff\"/></linearGradient></defs><path fill=\"url(#jhs)\" d=\"M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C8 11 11 8 12 0Z\"/></svg><span style=\"color:#fff;font-weight:800;vertical-align:middle\">JioHotstar</span></span>", "apple music": "<svg viewBox=\"0 0 24 24\" style=\"height:1.4em;width:1.4em;vertical-align:middle\"><path fill=\"#fff\" d=\"M23.994 6.124a9.23 9.23 0 00-.24-2.19c-.317-1.31-1.062-2.31-2.18-3.043a5.022 5.022 0 00-1.877-.726 10.496 10.496 0 00-1.564-.15c-.04-.003-.083-.01-.124-.013H5.986c-.152.01-.303.017-.455.026-.747.043-1.49.123-2.193.4-1.336.53-2.3 1.452-2.865 2.78-.192.448-.292.925-.363 1.408-.056.392-.088.785-.1 1.18 0 .032-.007.062-.01.093v12.223c.01.14.017.283.027.424.05.815.154 1.624.497 2.373.65 1.42 1.738 2.353 3.234 2.801.42.127.856.187 1.293.228.555.053 1.11.06 1.667.06h11.03a12.5 12.5 0 001.57-.1c.822-.106 1.596-.35 2.295-.81a5.046 5.046 0 001.88-2.207c.186-.42.293-.87.37-1.324.113-.675.138-1.358.137-2.04-.002-3.8 0-7.595-.003-11.393zm-6.423 3.99v5.712c0 .417-.058.827-.244 1.206-.29.59-.76.962-1.388 1.14-.35.1-.706.157-1.07.173-.95.045-1.773-.6-1.943-1.536a1.88 1.88 0 011.038-2.022c.323-.16.67-.25 1.018-.324.378-.082.758-.153 1.134-.24.274-.063.457-.23.51-.516a.904.904 0 00.02-.193c0-1.815 0-3.63-.002-5.443a.725.725 0 00-.026-.185c-.04-.15-.15-.243-.304-.234-.16.01-.318.035-.475.066-.76.15-1.52.303-2.28.456l-2.325.47-1.374.278c-.016.003-.032.01-.048.013-.277.077-.377.203-.39.49-.002.042 0 .086 0 .13-.002 2.602 0 5.204-.003 7.805 0 .42-.047.836-.215 1.227-.278.64-.77 1.04-1.434 1.233-.35.1-.71.16-1.075.172-.96.036-1.755-.6-1.92-1.544-.14-.812.23-1.685 1.154-2.075.357-.15.73-.232 1.108-.31.287-.06.575-.116.86-.177.383-.083.583-.323.6-.714v-.15c0-2.96 0-5.922.002-8.882 0-.123.013-.25.042-.37.07-.285.273-.448.546-.518.255-.066.515-.112.774-.165.733-.15 1.466-.296 2.2-.444l2.27-.46c.67-.134 1.34-.27 2.01-.403.22-.043.442-.088.663-.106.31-.025.523.17.554.482.008.073.012.148.012.223.002 1.91.002 3.822 0 5.732z\"/></svg>", "spotify": "<svg viewBox=\"0 0 24 24\" style=\"height:1.6em;width:1.6em;vertical-align:middle\"><path fill=\"#1ed760\" d=\"M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z\"/></svg>" };
   var BRANDS = [
     ['tizentube', 'linear-gradient(145deg,#ff2d2d,#b00000)', '#fff', '\u25B6 TizenTube', 'font-weight:800'],
-    ['netflix', '#000', '#e50914', 'NETFLIX', 'font-weight:900;letter-spacing:3px'],
-    ['prime video', 'linear-gradient(145deg,#1ab7ea,#0a6fb5)', '#fff', 'prime video', 'font-weight:800;text-transform:lowercase'],
-    ['hotstar', 'linear-gradient(135deg,#0c1f6e,#6a1fd1 55%,#d41f8c)', '#fff', 'JioHotstar', 'font-weight:700'],
+    ['netflix', 'linear-gradient(145deg,#1a1a1a,#000)', '#e50914', 'NETFLIX', 'font-weight:900;letter-spacing:3px'],
+    ['prime video', 'linear-gradient(145deg,#173a5e,#00050d)', '#fff', 'prime video', 'font-weight:800;text-transform:lowercase'],
+    ['hotstar', 'linear-gradient(145deg,#0e1f5a,#030a24)', '#fff', 'JioHotstar', 'font-weight:700'],
     ['apple tv', '#000', '#fff', 'Apple TV', 'font-weight:500;letter-spacing:1px'],
     ['apple music', 'linear-gradient(145deg,#fb5c74,#fa233b)', '#fff', '\u266B Music', 'font-weight:600'],
     ['youtube', '#fff', '#111', '<b style="color:#f00">\u25B6</b> YouTube', 'font-weight:700'],
@@ -227,7 +236,7 @@
     ['zee5', 'linear-gradient(145deg,#2a0b4a,#0d0418)', '#fff', 'ZEE5', 'font-weight:900;letter-spacing:2px'],
     ['sony liv', 'linear-gradient(145deg,#111,#2a2a2a)', '#f5b800', 'SONY LIV', 'font-weight:800'],
     ['sonyliv', 'linear-gradient(145deg,#111,#2a2a2a)', '#f5b800', 'SONY LIV', 'font-weight:800'],
-    ['spotify', '#1db954', '#000', 'Spotify', 'font-weight:800'],
+    ['spotify', 'linear-gradient(145deg,#1a1a1a,#000)', '#fff', 'Spotify', 'font-weight:800'],
     ['viki', 'linear-gradient(145deg,#2aa7ff,#0a7ed8)', '#fff', 'Viki', 'font-weight:900'],
     ['samsung tv plus', 'linear-gradient(145deg,#14234d,#0a1128)', '#fff', 'TV Plus', 'font-weight:700'],
     ['mx player', 'linear-gradient(145deg,#2b7bff,#0a4fd1)', '#fff', 'MX Player', 'font-weight:800'],
@@ -319,9 +328,6 @@
     $('ampm').textContent = h < 12 ? 'AM' : 'PM';
     $('date').textContent = dateStr;
     $('greet').textContent = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-    var night = h >= 22 || h < 6;
-    if (night !== (document.body.className.indexOf(' night') !== -1))
-      document.body.className = document.body.className.replace(/\s*night\b/g, '') + (night ? ' night' : '');
     $('sclock').textContent = (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m;
     $('sdate').textContent = dateStr;
   }
@@ -514,17 +520,21 @@
     var card = document.createElement('div');
     card.className = 'card';
     var brand = brandOf(t.name);
-    card.style.background = brand ? brand[1] : 'linear-gradient(145deg, ' + t.color + ' 0%, rgba(0,0,0,.6) 120%)';
+    var bgl = document.createElement('div'); bgl.className = 'bgl';
+    bgl.style.background = brand ? brand[1] : 'linear-gradient(145deg, ' + t.color + ' 0%, rgba(0,0,0,.6) 120%)';
+    card.appendChild(bgl);
     el.appendChild(card);
     var label = function () {
       var n = document.createElement('div'); n.className = 'name';
       var s = document.createElement('span');
-      if (brand) { s.innerHTML = brand[3]; s.style.cssText = 'color:' + brand[2] + ';text-shadow:none;' + brand[4]; }
+      if (brand && LOGOS[brand[0]]) { s.innerHTML = LOGOS[brand[0]]; s.style.textShadow = 'none'; }
+      else if (brand) { s.innerHTML = brand[3]; s.style.cssText = 'color:' + brand[2] + ';text-shadow:none;' + brand[4]; }
       else s.textContent = t.name;
       n.appendChild(s); return n;
     };
     // Brand wordmark first; if the TV gives us the app's real icon, it covers the card like on Apple TV.
-    card.appendChild(label());
+    var lab = label();
+    card.appendChild(lab);
     if (t.icon) {
       var img = new Image();
       img.onload = function () {
@@ -532,13 +542,14 @@
         art.style.backgroundImage = 'url("' + t.icon + '")';
         // Wide artwork fills the card; square logos sit centred on the coloured card instead of being cropped.
         if (img.naturalWidth / img.naturalHeight < 1.4) art.style.backgroundSize = 'auto 62%';
-        card.insertBefore(art, card.firstChild.nextSibling);
-        card.removeChild(card.firstChild);
+        card.insertBefore(art, lab);
+        card.removeChild(lab);
         var u = document.createElement('div'); u.className = 'under'; u.textContent = t.name; el.appendChild(u);
       };
       img.src = t.icon;
     }
     var g = document.createElement('div'); g.className = 'gloss'; card.appendChild(g);
+    var rim = document.createElement('div'); rim.className = 'rim'; card.appendChild(rim);
     var sw = document.createElement('div'); sw.className = 'sweep'; card.appendChild(sw);
     return el;
   }
@@ -552,6 +563,16 @@
     if (rows[0].length) setTimeout(function () { focus(-1, 2); }, 50);
   }
   if (simple) { document.body.className += ' simple'; $('simpleBtn').innerHTML = '&#9638; All apps'; }
+
+  // Dim is off unless you switch it on; the choice is remembered.
+  var dim = store('dim') === '1';
+  function setDim(on, say) {
+    dim = on; store('dim', on ? '1' : '0');
+    document.body.className = document.body.className.replace(/\s*night\b/g, '') + (on ? ' night' : '');
+    $('dimBtn').innerHTML = on ? '&#9681; Dim on' : '&#9681; Dim';
+    if (say) toast(on ? 'Screen dimmed' : 'Dim off');
+  }
+  setDim(dim, false);
 
   // Continue watching: the app opened last moves to the front with a badge, and the cursor starts on it.
   function lastIndex() {
@@ -595,7 +616,7 @@
   function focus(r, c) {
     var old = pos.r === -1 ? null : rows[pos.r][pos.c];
     if (old && old.el) old.el.className = 'tile';
-    var pills = ['saverBtn', 'themeBtn', 'simpleBtn', 'setBtn'];
+    var pills = ['saverBtn', 'themeBtn', 'simpleBtn', 'dimBtn', 'setBtn'];
     pills.forEach(function (id) { $(id).className = 'pill'; });
     if (r === -1) { c = Math.max(0, Math.min(pills.length - 1, c)); pos = { r: -1, c: c }; $(pills[c]).className = 'pill focus'; setHint(); return; }
     if (!rows[r].length) return;
@@ -705,7 +726,8 @@
       case 13:
         if (pos.r === -1 && pos.c === 0) { startSaver(true); break; }
         if (pos.r === -1 && pos.c === 2) { setSimple(!simple); break; }
-        if (pos.r === -1 && pos.c === 3) { openTizenBrewMenu(); break; }
+        if (pos.r === -1 && pos.c === 3) { setDim(!dim, true); break; }
+        if (pos.r === -1 && pos.c === 4) { openTizenBrewMenu(); break; }
         if (pos.r === -1) { applyTheme(themeIdx + 1, true); setTimeout(setHint, 500); }
         else launch(rows[pos.r][pos.c]);
         break;
