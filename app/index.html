@@ -268,12 +268,34 @@
     x.onload = function () { try { cb(JSON.parse(x.responseText)); } catch (e) {} };
     x.send();
   }
+  // Find the TV's town from its internet address. Several free services, tried in turn, and the
+  // last answer is remembered so weather still shows if they're all down.
+  var GEO = [
+    ['https://ipwho.is/', function (d) { return d.success !== false && d.latitude && { latitude: d.latitude, longitude: d.longitude, city: d.city }; }],
+    ['https://ipapi.co/json/', function (d) { return d.latitude && { latitude: d.latitude, longitude: d.longitude, city: d.city }; }],
+    ['https://get.geojs.io/v1/ip/geo.json', function (d) { return d.latitude && { latitude: +d.latitude, longitude: +d.longitude, city: d.city }; }]
+  ];
+  function locate(cb, i) {
+    i = i || 0;
+    if (i >= GEO.length) { var saved = null; try { saved = JSON.parse(store('loc')); } catch (e) {} if (saved) cb(saved); return; }
+    var done = false, next = function () { if (!done) { done = true; locate(cb, i + 1); } };
+    var x = new XMLHttpRequest();
+    x.open('GET', GEO[i][0], true); x.timeout = 8000;
+    x.onload = function () {
+      var loc = null; try { loc = GEO[i][1](JSON.parse(x.responseText)); } catch (e) {}
+      if (!loc) return next();
+      done = true; store('loc', JSON.stringify(loc)); cb(loc);
+    };
+    x.onerror = x.ontimeout = next;
+    x.send();
+  }
+  var weatherOk = false;
   function weather() {
-    getJSON('https://ipwho.is/', function (loc) {
-      if (!loc || !loc.latitude) return;
+    locate(function (loc) {
       getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + loc.latitude + '&longitude=' + loc.longitude +
         '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto', function (w) {
         if (!w || !w.current) return;
+        weatherOk = true;
         var temp = Math.round(w.current.temperature_2m) + '\u00B0', desc = WCODE[w.current.weather_code] || '';
         $('wtemp').textContent = temp;
         $('wdesc').textContent = desc;
@@ -286,6 +308,8 @@
     });
   }
   weather(); setInterval(weather, 15 * 60 * 1000);
+  // Until the first report arrives (the network can be slow right after the TV wakes), try every minute.
+  var retry = setInterval(function () { if (weatherOk) clearInterval(retry); else weather(); }, 60 * 1000);
 
   // ---------- wallpapers ----------
   var pins = [], photoN = 0;
