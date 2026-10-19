@@ -127,7 +127,7 @@
   @-webkit-keyframes sweep { 0% { opacity: 1; -webkit-transform: translateX(-120%) skewX(-15deg); } 100% { opacity: 1; -webkit-transform: translateX(320%) skewX(-15deg); } }
   @keyframes sweep { 0% { opacity: 1; transform: translateX(-120%) skewX(-15deg); } 100% { opacity: 1; transform: translateX(320%) skewX(-15deg); } }
 
-  #hint { position: absolute; left: 96px; bottom: 34px; font-size: 26px; opacity: .55; }
+  #hint { display: none; }
   #hint i { font-style: normal; font-size: 20px; opacity: .45; white-space: pre; }
   #hint b { color: var(--accent); font-weight: 600; opacity: 1; }
 
@@ -193,7 +193,7 @@
   var FAVS = [
     { match: ['tizentube', 'tizenbrew'], name: 'TizenTube', color: '#e62117', ids: ['xvvl3S1bvH.TizenBrewStandalone'] },
     { match: ['netflix'], name: 'Netflix', color: '#b20710', ids: ['3201907018807', '11101200001'] },
-    { match: ['prime video'], name: 'Prime Video', color: '#00a8e1', ids: [] },
+    { match: ['prime video'], name: 'Prime Video', color: '#00a8e1', ids: ['3201910019365'] },
     { match: ['jiohotstar', 'hotstar'], name: 'JioHotstar', color: '#2b3bbf', ids: [] },
     { match: ['apple tv'], name: 'Apple TV', color: '#3a3a3c', ids: ['3201807016597'] },
     { match: ['aha'], name: 'aha', color: '#f26a21', ids: [] },
@@ -206,7 +206,8 @@
   var SYSTEM = ['widget', 'popup', 'service', 'adplayer', 'agingapp', 'survey', 'framework', 'aria video', 'bixby', 'alexa'];
   function isSystem(a) {
     // Names like "bnr-service" or "csfw_agent" are internal parts, not apps people open.
-    return contains(a.name, SYSTEM) || /^[a-z0-9]+([-_.][a-z0-9]+)+$/.test(a.name || '');
+    return contains(a.name, SYSTEM) || /^[a-z0-9]+([-_.][a-z0-9]+)+$/.test(a.name || '') ||
+      /^apps?$/i.test(a.name || '');
   }
   var HIDE = ['tizentube', 'web browser', 'internet', 'gallery', 'samsung promotion', 'universal guide', 'dashboard', 'e-manual', 'smartthings'];
   var THEMES = [['', 'Midnight'], ['t-aurora', 'Aurora'], ['t-sunset', 'Sunset'], ['t-ocean', 'Ocean'], ['t-gold', 'Gold'], ['t-mono', 'Mono'], ['t-photo', 'Photo']];
@@ -412,14 +413,21 @@
   function build(apps) {
     var used = {};
     FAVS.forEach(function (f) {
-      // Try each name in order, so "Prime Video" can't land on a built-in like Alexa or Bixby.
+      // Try each name in order, so "Prime Video" can't land on a built-in like Alexa or Bixby,
+      // and prefer a real app over a preinstalled placeholder with the same name.
       var found = null;
       for (var m = 0; m < f.match.length && !found; m++) {
         for (var i = 0; i < apps.length; i++) {
-          if (!used[apps[i].id] && !isSystem(apps[i]) && contains(apps[i].name, [f.match[m]])) { found = apps[i]; break; }
+          if (used[apps[i].id] || isSystem(apps[i]) || !contains(apps[i].name, [f.match[m]])) continue;
+          if (!found || /dummy/i.test(found.id)) found = apps[i];
         }
       }
-      if (found) { used[found.id] = 1; rows[0].push({ name: f.name, color: f.color, ids: [found.id], icon: found.iconPath }); }
+      if (found) {
+        used[found.id] = 1;
+        // A preinstalled placeholder ("...-dummy") can't play anything, so try the real app's known id first.
+        var ids = /dummy/i.test(found.id) ? f.ids.concat([found.id]) : [found.id].concat(f.ids);
+        rows[0].push({ name: f.name, color: f.color, ids: ids, icon: found.iconPath });
+      }
       else if (!apps.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids });
     });
     // If none of the favourites matched by name, keep the built-in list rather than an empty row.
@@ -428,7 +436,7 @@
       FAVS.forEach(function (f) { if (f.ids.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids }); });
     }
     var rest = apps.filter(function (a) {
-      return !used[a.id] && !contains(a.name, HIDE) && !isSystem(a);
+      return !used[a.id] && !contains(a.name, HIDE) && !isSystem(a) && !/dummy/i.test(a.id);
     });
     rest.sort(function (a, b) { return lc(a.name) < lc(b.name) ? -1 : 1; });
     rest.forEach(function (a, i) {
@@ -524,14 +532,37 @@
   }
 
   function launch(t) {
-    // TizenTube lives in TizenBrew's own module list, one step back.
-    if (inTizenBrew && t.name === 'TizenTube') { history.back(); return; }
+    if (inTizenBrew && t.name === 'TizenTube') { openModule('tizentube'); return; }
     if (inTizenBrew && t.ids.length) {
       toast('Opening ' + t.name + '\u2026');
-      svc('/launch?ids=' + encodeURIComponent(t.ids.join(',')), function () {}, function () { launchHere(t); });
+      svc('/launch?ids=' + encodeURIComponent(t.ids.join(',')), function () {}, function () {
+        if (hasTizen) launchHere(t); else toast(t.name + ' didn\'t open. It may not be installed on this TV.');
+      });
       return;
     }
     launchHere(t);
+  }
+  // Start a TizenBrew module (like TizenTube) the way TizenBrew's own menu does: tell its service
+  // over the local WebSocket, then go to the module's page. Falls back to TizenBrew's menu.
+  function openModule(word) {
+    toast('Opening TizenTube\u2026');
+    var done = false, ws;
+    var fallback = function () { if (!done) { done = true; try { ws.close(); } catch (e) {} history.back(); } };
+    setTimeout(fallback, 6000);
+    try { ws = new WebSocket('ws://127.0.0.1:8081'); } catch (e) { return fallback(); }
+    ws.onerror = fallback;
+    ws.onopen = function () { ws.send(JSON.stringify({ type: 4, payload: false })); };
+    ws.onmessage = function (e) {
+      var msg; try { msg = JSON.parse(e.data); } catch (err) { return; }
+      if (msg.type !== 4) return;
+      if (!msg.payload) { ws.send(JSON.stringify({ type: 4, payload: true })); return; }
+      var mod = null;
+      msg.payload.forEach(function (m) { if (!mod && lc(m.fullName + ' ' + m.appName).indexOf(word) !== -1) mod = m; });
+      if (!mod || !mod.appPath) return fallback();
+      done = true;
+      ws.send(JSON.stringify({ type: 5, payload: mod }));
+      setTimeout(function () { location.href = mod.appPath; }, 400);
+    };
   }
   function launchHere(t) {
     if (!hasTizen) { toast(location.protocol === 'file:' ? 'Would open ' + t.name : t.name + ' can\'t be opened from inside TizenBrew'); return; }
