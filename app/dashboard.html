@@ -92,6 +92,18 @@
   #l2 { top: 730px; }
   .rowWrap { position: absolute; left: 0; right: 0; }
   #r1 { top: 450px; height: 240px; }
+  /* Simple mode: only the favourites, bigger, nothing else to get lost in. */
+  body.simple #l2, body.simple #r2 { display: none; }
+  body.simple #l1 { top: 470px; }
+  body.simple #r1 { top: 535px; height: 330px; }
+  body.simple #r1 .tile { width: 520px; height: 293px; }
+  body.simple #r1 .name span { font-size: 60px; }
+  /* Night: everything a little dimmer and warmer, easier on the eyes. */
+  #night { position: absolute; top: 0; left: 0; right: 0; bottom: 0; pointer-events: none; opacity: 0;
+    background: rgba(20,8,0,.35); -webkit-transition: opacity 3s; transition: opacity 3s; }
+  body.night #night { opacity: 1; }
+  .badge { position: absolute; left: 16px; top: 14px; padding: 5px 14px; border-radius: 20px; font-size: 20px; font-weight: 700;
+    background: rgba(255,255,255,.92); color: #111; z-index: 2; }
   #r2 { top: 785px; height: 190px; }
   .row { position: absolute; left: 96px; top: 0; white-space: nowrap;
     -webkit-transition: -webkit-transform .45s cubic-bezier(.2,.8,.2,1); transition: transform .45s cubic-bezier(.2,.8,.2,1); }
@@ -164,7 +176,7 @@
     <div id="date"></div>
     <div id="greet"></div>
     <div id="weather"><div id="wtemp"></div><div id="wdesc"></div><div id="wrange"></div><div id="wplace"></div></div>
-    <div id="btns"><div id="saverBtn" class="pill">&#9654; Screensaver</div><div id="themeBtn" class="pill"><span class="dot"></span><span id="themeName">Theme</span></div><div id="setBtn" class="pill">&#9881; Settings</div></div>
+    <div id="btns"><div id="saverBtn" class="pill">&#9654; Screensaver</div><div id="themeBtn" class="pill"><span class="dot"></span><span id="themeName">Theme</span></div><div id="simpleBtn" class="pill">&#9635; Simple</div><div id="setBtn" class="pill">&#9881; Settings</div></div>
   </div>
 
   <div class="label rise" id="l1" style="-webkit-animation-delay:.15s;animation-delay:.15s">FAVOURITES</div>
@@ -176,6 +188,7 @@
 
 <div id="saver"><div class="photo"></div><div class="photo"></div><div id="saverShade"></div>
   <div id="sinfo"><div id="sclock"></div><div id="sdate"></div></div><div id="sweather"></div></div>
+<div id="night"></div>
 <div id="toast"></div>
 </div>
 
@@ -306,6 +319,9 @@
     $('ampm').textContent = h < 12 ? 'AM' : 'PM';
     $('date').textContent = dateStr;
     $('greet').textContent = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    var night = h >= 22 || h < 6;
+    if (night !== (document.body.className.indexOf(' night') !== -1))
+      document.body.className = document.body.className.replace(/\s*night\b/g, '') + (night ? ' night' : '');
     $('sclock').textContent = (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m;
     $('sdate').textContent = dateStr;
   }
@@ -351,13 +367,18 @@
   function weather() {
     locate(function (loc) {
       getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + loc.latitude + '&longitude=' + loc.longitude +
-        '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto', function (w) {
+        '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto', function (w) {
         if (!w || !w.current) return;
         weatherOk = true;
         var temp = Math.round(w.current.temperature_2m) + '\u00B0', desc = WCODE[w.current.weather_code] || '';
         $('wtemp').textContent = temp;
         $('wdesc').textContent = desc;
-        if (w.daily) $('wrange').textContent = 'H ' + Math.round(w.daily.temperature_2m_max[0]) + '\u00B0  L ' + Math.round(w.daily.temperature_2m_min[0]) + '\u00B0';
+        if (w.daily) {
+          $('wrange').textContent = 'H ' + Math.round(w.daily.temperature_2m_max[0]) + '\u00B0  L ' + Math.round(w.daily.temperature_2m_min[0]) + '\u00B0';
+          // A heads-up worth having in the morning: will it rain today?
+          var rain = w.daily.precipitation_probability_max && w.daily.precipitation_probability_max[0];
+          if (rain >= 40) $('wdesc').textContent = desc + ' \u00B7 \u2602 ' + rain + '% rain today';
+        }
         $('wplace').textContent = loc.city || '';
         $('sweather').innerHTML = '<b></b><span></span>';
         $('sweather').firstChild.textContent = temp;
@@ -517,7 +538,29 @@
     return el;
   }
 
+  var simple = store('simple') === '1';
+  function setSimple(on) {
+    simple = on; store('simple', on ? '1' : '0');
+    document.body.className = document.body.className.replace(/\s*simple\b/g, '') + (on ? ' simple' : '');
+    $('simpleBtn').innerHTML = on ? '&#9638; All apps' : '&#9635; Simple';
+    toast(on ? 'Simple mode: just your favourites' : 'Showing all apps');
+    if (rows[0].length) setTimeout(function () { focus(-1, 2); }, 50);
+  }
+  if (simple) { document.body.className += ' simple'; $('simpleBtn').innerHTML = '&#9638; All apps'; }
+
+  // Continue watching: the app opened last moves to the front with a badge, and the cursor starts on it.
+  function lastIndex() {
+    var last = store('last');
+    if (!last) return -1;
+    for (var i = 0; i < rows[0].length; i++) if (rows[0][i].name === last) return i;
+    for (var j = 0; j < rows[1].length; j++) if (rows[1][j].name === last) {
+      rows[0].unshift(rows[1].splice(j, 1)[0]);
+      return 0;
+    }
+    return -1;
+  }
   function render() {
+    var li = lastIndex();
     ['row1', 'row2'].forEach(function (id, r) {
       var row = $(id);
       row.innerHTML = '';
@@ -528,7 +571,11 @@
       });
     });
     if (!rows[1].length) $('l2').style.display = 'none';
-    focus(0, 0);
+    if (li >= 0) {
+      var b = document.createElement('div'); b.className = 'badge'; b.textContent = '\u25B6 Continue';
+      rows[0][li].el.firstChild.appendChild(b);
+    }
+    focus(0, Math.max(0, li));
   }
 
   function setHint() {
@@ -543,7 +590,7 @@
   function focus(r, c) {
     var old = pos.r === -1 ? null : rows[pos.r][pos.c];
     if (old && old.el) old.el.className = 'tile';
-    var pills = ['saverBtn', 'themeBtn', 'setBtn'];
+    var pills = ['saverBtn', 'themeBtn', 'simpleBtn', 'setBtn'];
     pills.forEach(function (id) { $(id).className = 'pill'; });
     if (r === -1) { c = Math.max(0, Math.min(pills.length - 1, c)); pos = { r: -1, c: c }; $(pills[c]).className = 'pill focus'; setHint(); return; }
     if (!rows[r].length) return;
@@ -573,6 +620,7 @@
   }
 
   function launch(t) {
+    store('last', t.name);
     if (inTizenBrew && t.name === 'TizenTube') { openModule('tizentube'); return; }
     if (inTizenBrew && t.ids.length) {
       toast('Opening ' + t.name + '\u2026');
@@ -648,10 +696,11 @@
       case 37: focus(pos.r, pos.c - 1); break;
       case 39: focus(pos.r, pos.c + 1); break;
       case 38: if (pos.r === 1) focus(0, Math.round(pos.c * 290 / 380)); else if (pos.r === 0) focus(-1, 1); break;
-      case 40: if (pos.r === -1) focus(0, 0); else if (pos.r === 0 && rows[1].length) focus(1, Math.round(pos.c * 380 / 290)); break;
+      case 40: if (pos.r === -1) focus(0, 0); else if (pos.r === 0 && rows[1].length && !simple) focus(1, Math.round(pos.c * 380 / 290)); break;
       case 13:
         if (pos.r === -1 && pos.c === 0) { startSaver(true); break; }
-        if (pos.r === -1 && pos.c === 2) { openTizenBrewMenu(); break; }
+        if (pos.r === -1 && pos.c === 2) { setSimple(!simple); break; }
+        if (pos.r === -1 && pos.c === 3) { openTizenBrewMenu(); break; }
         if (pos.r === -1) { applyTheme(themeIdx + 1, true); setTimeout(setHint, 500); }
         else launch(rows[pos.r][pos.c]);
         break;
