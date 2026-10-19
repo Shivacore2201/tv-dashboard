@@ -433,9 +433,30 @@
     setHint();
   }
 
+  // Inside TizenBrew the page itself can't open apps, so it asks the dashboard's service (service/service.js).
+  var SVC = 'http://127.0.0.1:8095';
+  function svc(path, ok, fail) {
+    var x = new XMLHttpRequest();
+    x.open('GET', SVC + path, true); x.timeout = 8000;
+    x.onload = function () {
+      var d = null; try { d = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status === 200 && d) ok(d); else fail();
+    };
+    x.onerror = x.ontimeout = fail;
+    x.send();
+  }
+
   function launch(t) {
     // TizenTube lives in TizenBrew's own module list, one step back.
     if (inTizenBrew && t.name === 'TizenTube') { history.back(); return; }
+    if (inTizenBrew && t.ids.length) {
+      toast('Opening ' + t.name + '\u2026');
+      svc('/launch?ids=' + encodeURIComponent(t.ids.join(',')), function () {}, function () { launchHere(t); });
+      return;
+    }
+    launchHere(t);
+  }
+  function launchHere(t) {
     if (!hasTizen) { toast(location.protocol === 'file:' ? 'Would open ' + t.name : t.name + ' can\'t be opened from inside TizenBrew'); return; }
     var ids = t.ids.slice();
     if (!ids.length) { toast(t.name + ' is not installed on this TV'); return; }
@@ -483,7 +504,17 @@
     e.preventDefault();
   });
 
-  if (hasTizen) {
+  if (inTizenBrew) {
+    build([]);
+    // The service can take a few seconds to start; once it answers, rebuild with the TV's real app list.
+    (function askApps(tries) {
+      svc('/apps', function (apps) {
+        if (!apps.length) return;
+        rows = [[], []]; $('l2').style.display = '';
+        build(apps);
+      }, function () { if (tries > 0) setTimeout(function () { askApps(tries - 1); }, 2000); });
+    })(8);
+  } else if (hasTizen) {
     try {
       tizen.application.getAppsInfo(function (list) {
         var apps = [];
