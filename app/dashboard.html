@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, height=1080">
+<title>Dashboard</title>
+<style>
+  /* Only transform and opacity are animated: the TV's chip handles those smoothly. */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; color: #fff;
+    font-family: "SamsungOne", "Helvetica Neue", Arial, sans-serif; }
+
+  /* Everything is laid out for 1920x1080 and scaled to the real screen, which some TVs report as 4K. */
+  #stage { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; overflow: hidden;
+    -webkit-transform-origin: 0 0; transform-origin: 0 0; }
+
+  /* ---------- themes ---------- */
+  body { --base1: #1b2440; --base2: #0b0d18; --c1: 58,91,217; --c2: 138,58,217; --c3: 26,166,183; --accent: #8fb4ff; background: var(--base2); }
+  body.t-aurora { --base1: #0f2a2a; --base2: #050d10; --c1: 30,200,150; --c2: 40,120,220; --c3: 140,230,120; --accent: #7cf0c4; }
+  body.t-sunset { --base1: #3a1a2a; --base2: #120810; --c1: 255,110,70; --c2: 220,50,120; --c3: 255,180,60; --accent: #ffb38a; }
+  body.t-ocean  { --base1: #0b2240; --base2: #040a16; --c1: 20,120,220; --c2: 0,190,210; --c3: 60,80,200; --accent: #6fd8ff; }
+  body.t-mono   { --base1: #222; --base2: #070707; --c1: 120,120,120; --c2: 70,70,70; --c3: 160,160,160; --accent: #ffffff; }
+  body.t-photo  { --base1: #111; --base2: #000; --c1: 255,255,255; --c2: 200,200,200; --c3: 150,150,150; --accent: #ffffff; }
+  body.t-gold   { --base1: #2a2112; --base2: #0c0905; --c1: 212,160,60; --c2: 140,90,30; --c3: 240,210,140; --accent: #f3d28a; }
+
+  #bg { position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden;
+    background: linear-gradient(160deg, var(--base1) 0%, var(--base2) 70%);
+    -webkit-transition: opacity .45s ease; transition: opacity .45s ease; }
+  #bg.fade { opacity: 0; }
+  .blob { position: absolute; border-radius: 50%; will-change: transform; }
+  .b1 { width: 1400px; height: 1400px; left: -500px; top: -700px;
+    background: radial-gradient(circle, rgba(var(--c1),.55) 0%, rgba(var(--c1),0) 65%);
+    -webkit-animation: drift1 38s ease-in-out infinite alternate; animation: drift1 38s ease-in-out infinite alternate; }
+  .b2 { width: 1300px; height: 1300px; right: -500px; top: -100px;
+    background: radial-gradient(circle, rgba(var(--c2),.42) 0%, rgba(var(--c2),0) 65%);
+    -webkit-animation: drift2 46s ease-in-out infinite alternate; animation: drift2 46s ease-in-out infinite alternate; }
+  .b3 { width: 1200px; height: 1200px; left: 300px; bottom: -800px;
+    background: radial-gradient(circle, rgba(var(--c3),.35) 0%, rgba(var(--c3),0) 65%);
+    -webkit-animation: drift3 54s ease-in-out infinite alternate; animation: drift3 54s ease-in-out infinite alternate; }
+  @-webkit-keyframes drift1 { to { -webkit-transform: translate(380px, 220px) scale(1.15); } }
+  @keyframes drift1 { to { transform: translate(380px, 220px) scale(1.15); } }
+  @-webkit-keyframes drift2 { to { -webkit-transform: translate(-420px, 160px) scale(.9); } }
+  @keyframes drift2 { to { transform: translate(-420px, 160px) scale(.9); } }
+  @-webkit-keyframes drift3 { to { -webkit-transform: translate(300px, -200px) scale(1.2); } }
+  @keyframes drift3 { to { transform: translate(300px, -200px) scale(1.2); } }
+  .photo { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center;
+    opacity: 0; -webkit-transition: opacity 2s ease; transition: opacity 2s ease; }
+  .photo.on { opacity: 1; -webkit-animation: kenburns 24s linear forwards; animation: kenburns 24s linear forwards; }
+  @-webkit-keyframes kenburns { from { -webkit-transform: scale(1); } to { -webkit-transform: scale(1.12) translate(-1%, -1%); } }
+  @keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.12) translate(-1%, -1%); } }
+  #bgPhotos { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; }
+  body.t-photo #bgPhotos { display: block; }
+  body.t-photo .blob { display: none; }
+  body.t-photo #vignette { background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 35%, rgba(0,0,0,.75) 100%); }
+  #vignette { position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.45) 100%); }
+
+  /* ---------- entrance ---------- */
+  .rise { opacity: 0; -webkit-animation: rise .7s cubic-bezier(.2,.8,.2,1) forwards; animation: rise .7s cubic-bezier(.2,.8,.2,1) forwards; }
+  @-webkit-keyframes rise { from { opacity: 0; -webkit-transform: translateY(40px); } to { opacity: 1; -webkit-transform: none; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- header ---------- */
+  #ui { position: absolute; top: 0; left: 0; right: 0; bottom: 0; -webkit-transition: opacity .8s; transition: opacity .8s; }
+  #top { position: absolute; left: 96px; right: 96px; top: 64px; height: 260px; }
+  #time { font-size: 150px; font-weight: 200; letter-spacing: -4px; line-height: 1; }
+  #colon { -webkit-animation: blink 2s ease-in-out infinite; animation: blink 2s ease-in-out infinite; }
+  @-webkit-keyframes blink { 50% { opacity: .25; } }
+  @keyframes blink { 50% { opacity: .25; } }
+  #ampm { font-size: 46px; font-weight: 300; margin-left: 10px; opacity: .7; letter-spacing: 0; }
+  #date { font-size: 38px; font-weight: 300; opacity: .75; margin-top: 14px; }
+  #greet { font-size: 38px; font-weight: 600; margin-top: 6px; color: var(--accent); }
+  #weather { position: absolute; right: 0; top: 4px; text-align: right; }
+  #wtemp { font-size: 96px; font-weight: 200; line-height: 1; }
+  #wdesc { font-size: 32px; opacity: .75; margin-top: 10px; }
+  #wplace { font-size: 26px; opacity: .5; margin-top: 4px; }
+
+  #themeBtn { position: absolute; right: 0; top: 290px; padding: 12px 26px; border-radius: 40px; font-size: 26px; font-weight: 600;
+    background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.15);
+    -webkit-transition: -webkit-transform .25s, background .25s; transition: transform .25s, background .25s; }
+  #themeBtn .dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-right: 12px; vertical-align: -1px; background: var(--accent); }
+  #themeBtn.focus { background: rgba(255,255,255,.95); color: #111; -webkit-transform: scale(1.1); transform: scale(1.1); }
+
+  /* ---------- rows ---------- */
+  .label { position: absolute; left: 96px; font-size: 28px; font-weight: 700; opacity: .55; letter-spacing: 3px; }
+  #l1 { top: 395px; }
+  #l2 { top: 730px; }
+  .rowWrap { position: absolute; left: 0; right: 0; }
+  #r1 { top: 450px; height: 240px; }
+  #r2 { top: 785px; height: 190px; }
+  .row { position: absolute; left: 96px; top: 0; white-space: nowrap;
+    -webkit-transition: -webkit-transform .45s cubic-bezier(.2,.8,.2,1); transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+
+  .tile { display: inline-block; vertical-align: top; position: relative; margin-right: 34px; }
+  .card { position: relative; width: 100%; height: 100%; border-radius: 28px; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+    -webkit-transition: -webkit-transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s; transition: transform .3s cubic-bezier(.2,.8,.2,1), box-shadow .3s; }
+  #r1 .tile { width: 380px; height: 214px; }
+  #r2 .tile { width: 290px; height: 163px; }
+  #r2 .card { border-radius: 22px; }
+  .tile.focus .card { -webkit-transform: scale(1.13); transform: scale(1.13);
+    box-shadow: 0 34px 70px rgba(0,0,0,.65), 0 0 0 5px var(--accent), 0 0 50px rgba(var(--c1),.6); }
+  .tile:not(.focus) .card { opacity: .88; }
+  .name { position: absolute; top: 0; left: 0; display: table; width: 100%; height: 100%; }
+  .name span { display: table-cell; vertical-align: middle; text-align: center; font-weight: 700; padding: 0 20px; white-space: normal; text-shadow: 0 2px 10px rgba(0,0,0,.35); }
+  #r1 .name span { font-size: 44px; }
+  #r2 .name span { font-size: 32px; }
+  .card img { position: absolute; left: 50%; top: 46%; width: 96px; height: 96px; margin: -48px 0 0 -48px; }
+  .cap { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 22px; font-weight: 600; }
+  .gloss { position: absolute; left: 0; right: 0; top: 0; height: 55%;
+    background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0)); }
+  /* light sweep across the card when it gets focus */
+  .sweep { position: absolute; top: -20%; left: 0; width: 45%; height: 140%; opacity: 0;
+    background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.35) 50%, rgba(255,255,255,0) 100%);
+    -webkit-transform: translateX(-120%) skewX(-15deg); transform: translateX(-120%) skewX(-15deg); }
+  .tile.focus .sweep { -webkit-animation: sweep .9s ease-out .1s; animation: sweep .9s ease-out .1s; }
+  @-webkit-keyframes sweep { 0% { opacity: 1; -webkit-transform: translateX(-120%) skewX(-15deg); } 100% { opacity: 1; -webkit-transform: translateX(320%) skewX(-15deg); } }
+  @keyframes sweep { 0% { opacity: 1; transform: translateX(-120%) skewX(-15deg); } 100% { opacity: 1; transform: translateX(320%) skewX(-15deg); } }
+
+  #hint { position: absolute; left: 96px; bottom: 34px; font-size: 26px; opacity: .55; }
+  #hint b { color: var(--accent); font-weight: 600; opacity: 1; }
+
+  #toast { position: absolute; left: 50%; bottom: 40px; width: 900px; margin-left: -450px; text-align: center;
+    background: rgba(15,16,22,.92); border-radius: 20px; padding: 22px; font-size: 28px;
+    opacity: 0; -webkit-transform: translateY(20px); transform: translateY(20px);
+    -webkit-transition: opacity .3s, -webkit-transform .3s; transition: opacity .3s, transform .3s; }
+  #toast.show { opacity: 1; -webkit-transform: none; transform: none; }
+
+  /* ---------- idle screensaver (protects the screen, looks nice) ---------- */
+  #saver { position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0; pointer-events: none; background: #000; overflow: hidden;
+    -webkit-transition: opacity 1.2s; transition: opacity 1.2s; }
+  body.idle #saver { opacity: 1; }
+  body.idle #ui { opacity: 0; }
+  #saverShade { position: absolute; left: 0; right: 0; bottom: 0; height: 55%;
+    background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.7)); }
+  #sinfo { position: absolute; left: 96px; bottom: 80px; }
+  #sclock { font-size: 170px; font-weight: 100; letter-spacing: -5px; line-height: 1; text-shadow: 0 4px 30px rgba(0,0,0,.5); }
+  #sdate { font-size: 40px; font-weight: 300; opacity: .85; margin-top: 12px; }
+  #sweather { position: absolute; right: 96px; bottom: 90px; text-align: right; font-size: 40px; font-weight: 300; text-shadow: 0 2px 20px rgba(0,0,0,.6); }
+  #sweather b { display: block; font-size: 110px; font-weight: 100; line-height: 1; }
+  #wrange { font-size: 26px; opacity: .6; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="stage">
+<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div id="bgPhotos"><div class="photo"></div><div class="photo"></div></div><div id="vignette"></div></div>
+
+<div id="ui">
+  <div id="top" class="rise">
+    <div><span id="time">--:--</span><span id="ampm"></span></div>
+    <div id="date"></div>
+    <div id="greet"></div>
+    <div id="weather"><div id="wtemp"></div><div id="wdesc"></div><div id="wrange"></div><div id="wplace"></div></div>
+    <div id="themeBtn"><span class="dot"></span><span id="themeName">Theme</span></div>
+  </div>
+
+  <div class="label rise" id="l1" style="-webkit-animation-delay:.15s;animation-delay:.15s">FAVOURITES</div>
+  <div class="rowWrap" id="r1"><div class="row" id="row1"></div></div>
+  <div class="label rise" id="l2" style="-webkit-animation-delay:.35s;animation-delay:.35s">ALL APPS</div>
+  <div class="rowWrap" id="r2"><div class="row" id="row2"></div></div>
+  <div id="hint" class="rise" style="-webkit-animation-delay:.6s;animation-delay:.6s"></div>
+</div>
+
+<div id="saver"><div class="photo"></div><div class="photo"></div><div id="saverShade"></div>
+  <div id="sinfo"><div id="sclock"></div><div id="sdate"></div></div><div id="sweather"></div></div>
+<div id="toast"></div>
+</div>
+
+<script>
+  function fit() {
+    var w = window.innerWidth || 1920, h = window.innerHeight || 1080;
+    var st = document.getElementById('stage').style;
+    st.webkitTransform = st.transform = 'scale(' + (w / 1920) + ',' + (h / 1080) + ')';
+  }
+  fit();
+  window.addEventListener('resize', fit);
+(function () {
+  // Favourites, in this order, matched against installed app names.
+  // ids are fallbacks used only if the TV won't list its apps.
+  var FAVS = [
+    { match: ['tizentube', 'tizenbrew'], name: 'TizenTube', color: '#e62117', ids: ['xvvl3S1bvH.TizenBrewStandalone'] },
+    { match: ['netflix'], name: 'Netflix', color: '#b20710', ids: ['3201907018807', '11101200001'] },
+    { match: ['prime video', 'amazon'], name: 'Prime Video', color: '#00a8e1', ids: ['3201910019365', '3201512006785'] },
+    { match: ['jiohotstar', 'hotstar'], name: 'JioHotstar', color: '#2b3bbf', ids: [] },
+    { match: ['apple tv'], name: 'Apple TV', color: '#3a3a3c', ids: ['3201807016597'] },
+    { match: ['aha'], name: 'aha', color: '#f26a21', ids: [] },
+    { match: ['zee5'], name: 'ZEE5', color: '#7b2590', ids: [] },
+    { match: ['sony liv', 'sonyliv'], name: 'Sony LIV', color: '#444', ids: [] },
+    { match: ['youtube'], name: 'YouTube', color: '#cc0000', ids: ['111299001912'] }
+  ];
+  var PALETTE = ['#3a5bd9', '#8a3ad9', '#1aa6b7', '#d9573a', '#2f9e5b', '#c23a7a', '#5a6b8c', '#b7891a'];
+  var HIDE = ['tizentube', 'web browser', 'internet', 'gallery', 'samsung promotion', 'universal guide', 'dashboard', 'e-manual', 'smartthings'];
+  var THEMES = [['', 'Midnight'], ['t-aurora', 'Aurora'], ['t-sunset', 'Sunset'], ['t-ocean', 'Ocean'], ['t-gold', 'Gold'], ['t-mono', 'Mono'], ['t-photo', 'Photo']];
+  var IDLE_MS = 3 * 60 * 1000;
+  var PHOTO_MS = 20 * 1000;
+  // Paste a public Pinterest board link here (e.g. 'https://www.pinterest.com/name/board/')
+  // to use its pins as wallpapers. Left empty, Bing's daily photos are used (random photos if Bing fails).
+  var PINTEREST_BOARD = '';
+
+  var hasTizen = typeof tizen !== 'undefined' && tizen.application;
+  // Loaded as a TizenBrew module, the page is served from TizenBrew's local server.
+  var inTizenBrew = location.port === '8081';
+  var rows = [[], []];       // tile data per row; row -1 is the theme button
+  var pos = { r: 0, c: 0 };
+  var themeIdx = 0;
+
+  function $(id) { return document.getElementById(id); }
+  function lc(s) { return (s || '').toLowerCase(); }
+  function contains(name, list) {
+    var n = lc(name);
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].length > 4) { if (n.indexOf(list[i]) !== -1) return true; continue; }
+      // short names need a whole-word match so "aha" doesn't hit "Bahamas"
+      var re = new RegExp('(^|[^a-z])' + list[i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z]|$)');
+      if (re.test(n)) return true;
+    }
+    return false;
+  }
+  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} }
+
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg; t.className = 'show';
+    clearTimeout(toast.h); toast.h = setTimeout(function () { t.className = ''; }, 3500);
+  }
+
+  // ---------- theme ----------
+  function applyTheme(i, animate) {
+    themeIdx = (i + THEMES.length) % THEMES.length;
+    var set = function () {
+      document.body.className = document.body.className.replace(/\bt-\w+\b/g, '').trim();
+      if (THEMES[themeIdx][0]) document.body.className += ' ' + THEMES[themeIdx][0];
+      $('themeName').textContent = THEMES[themeIdx][1];
+      store('theme2', String(themeIdx));
+      if (THEMES[themeIdx][0] === 't-photo') setTimeout(function () { rotate($('bgPhotos')); }, 0);
+    };
+    if (!animate) return set();
+    $('bg').className = 'fade';
+    setTimeout(function () { set(); $('bg').className = ''; }, 450);
+  }
+  // Photo wallpapers are the default look; any theme picked with the button is remembered.
+  var savedTheme = store('theme2');
+  applyTheme(savedTheme ? parseInt(savedTheme, 10) || 0 : THEMES.length - 1, false);
+
+  // ---------- clock ----------
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function tick() {
+    var d = new Date(), h = d.getHours(), m = d.getMinutes();
+    var hm = (h % 12 || 12) + '<span id="colon">:</span>' + (m < 10 ? '0' : '') + m;
+    var dateStr = DAYS[d.getDay()] + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()];
+    $('time').innerHTML = hm;
+    $('ampm').textContent = h < 12 ? 'AM' : 'PM';
+    $('date').textContent = dateStr;
+    $('greet').textContent = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+    $('sclock').textContent = (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m;
+    $('sdate').textContent = dateStr;
+  }
+  tick(); setInterval(tick, 10000);
+
+  // ---------- weather (fails silently) ----------
+  var WCODE = { 0: 'Clear', 1: 'Mostly clear', 2: 'Partly cloudy', 3: 'Cloudy', 45: 'Fog', 48: 'Fog',
+    51: 'Drizzle', 53: 'Drizzle', 55: 'Drizzle', 61: 'Light rain', 63: 'Rain', 65: 'Heavy rain',
+    80: 'Showers', 81: 'Showers', 82: 'Heavy showers', 95: 'Thunderstorm', 96: 'Thunderstorm', 99: 'Thunderstorm' };
+  function getJSON(url, cb) {
+    var x = new XMLHttpRequest();
+    x.open('GET', url, true); x.timeout = 10000;
+    x.onload = function () { try { cb(JSON.parse(x.responseText)); } catch (e) {} };
+    x.send();
+  }
+  // Find the TV's town from its internet address. Several free services, tried in turn, and the
+  // last answer is remembered so weather still shows if they're all down.
+  var GEO = [
+    ['https://ipwho.is/', function (d) { return d.success !== false && d.latitude && { latitude: d.latitude, longitude: d.longitude, city: d.city }; }],
+    ['https://ipapi.co/json/', function (d) { return d.latitude && { latitude: d.latitude, longitude: d.longitude, city: d.city }; }],
+    ['https://get.geojs.io/v1/ip/geo.json', function (d) { return d.latitude && { latitude: +d.latitude, longitude: +d.longitude, city: d.city }; }]
+  ];
+  function locate(cb, i) {
+    i = i || 0;
+    // Ask the location services at most once a day, so the TV's address is shared as little as possible.
+    if (i === 0) {
+      var known = null; try { known = JSON.parse(store('loc')); } catch (e) {}
+      if (known && Date.now() - (parseInt(store('locTime'), 10) || 0) < 24 * 60 * 60 * 1000) return cb(known);
+    }
+    if (i >= GEO.length) { var saved = null; try { saved = JSON.parse(store('loc')); } catch (e) {} if (saved) cb(saved); return; }
+    var done = false, next = function () { if (!done) { done = true; locate(cb, i + 1); } };
+    var x = new XMLHttpRequest();
+    x.open('GET', GEO[i][0], true); x.timeout = 8000;
+    x.onload = function () {
+      var loc = null; try { loc = GEO[i][1](JSON.parse(x.responseText)); } catch (e) {}
+      if (!loc) return next();
+      done = true; store('loc', JSON.stringify(loc)); store('locTime', String(Date.now())); cb(loc);
+    };
+    x.onerror = x.ontimeout = next;
+    x.send();
+  }
+  var weatherOk = false;
+  function weather() {
+    locate(function (loc) {
+      getJSON('https://api.open-meteo.com/v1/forecast?latitude=' + loc.latitude + '&longitude=' + loc.longitude +
+        '&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=auto', function (w) {
+        if (!w || !w.current) return;
+        weatherOk = true;
+        var temp = Math.round(w.current.temperature_2m) + '\u00B0', desc = WCODE[w.current.weather_code] || '';
+        $('wtemp').textContent = temp;
+        $('wdesc').textContent = desc;
+        if (w.daily) $('wrange').textContent = 'H ' + Math.round(w.daily.temperature_2m_max[0]) + '\u00B0  L ' + Math.round(w.daily.temperature_2m_min[0]) + '\u00B0';
+        $('wplace').textContent = loc.city || '';
+        $('sweather').innerHTML = '<b></b><span></span>';
+        $('sweather').firstChild.textContent = temp;
+        $('sweather').lastChild.textContent = desc + (loc.city ? ' \u00B7 ' + loc.city : '');
+      });
+    });
+  }
+  weather(); setInterval(weather, 15 * 60 * 1000);
+  // Until the first report arrives (the network can be slow right after the TV wakes), try every minute.
+  var retry = setInterval(function () { if (weatherOk) clearInterval(retry); else weather(); }, 60 * 1000);
+
+  // ---------- wallpapers ----------
+  var pins = [], photoN = 0;
+  function loadPins() {
+    if (!PINTEREST_BOARD) return;
+    var url = PINTEREST_BOARD.replace(/\/?$/, '') + '.rss';
+    var x = new XMLHttpRequest();
+    x.open('GET', url, true); x.timeout = 15000;
+    x.onload = function () {
+      var m, re = /<img[^>]+src="([^"]+)"/g, out = [];
+      var text = x.responseText.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+      while ((m = re.exec(text))) out.push(m[1].replace(/\/(236x|474x|564x)\//, '/originals/'));
+      if (out.length) pins = out;
+    };
+    x.send();
+  }
+  // Bing's photo of the day archive: free, no account, about 16 recent pictures.
+  var bing = [];
+  function loadBing() {
+    [0, 8].forEach(function (idx) {
+      getJSON('https://www.bing.com/HPImageArchive.aspx?format=js&idx=' + idx + '&n=8&mkt=en-IN', function (d) {
+        if (!d || !d.images) return;
+        d.images.forEach(function (im) {
+          var u = 'https://www.bing.com' + im.url;
+          if (bing.indexOf(u) === -1) bing.push(u);
+        });
+      });
+    });
+  }
+  loadPins(); loadBing();
+  setInterval(function () { loadPins(); loadBing(); }, 6 * 60 * 60 * 1000);
+  function nextPhotoUrl() {
+    photoN++;
+    if (pins.length) return pins[photoN % pins.length];
+    if (bing.length) return bing[Math.floor(Math.random() * bing.length)];
+    return 'https://picsum.photos/1920/1080?random=' + Date.now() + photoN;
+  }
+  // Two layers per container; preload the next picture, then crossfade to it.
+  function rotate(container) {
+    var layers = container.getElementsByClassName('photo');
+    var url = nextPhotoUrl(), img = new Image();
+    // If a picture fails to load, fall back to a random free photo instead of leaving the screen blank.
+    img.onerror = function () {
+      if (url.indexOf('picsum.photos') !== -1) return;
+      url = 'https://picsum.photos/1920/1080?random=' + Date.now();
+      img.src = url;
+    };
+    img.onload = function () {
+      var cur = layers[0].className.indexOf('on') !== -1 ? 0 : 1, nxt = 1 - cur;
+      layers[nxt].style.backgroundImage = 'url("' + url + '")';
+      layers[nxt].className = 'photo';
+      void layers[nxt].offsetWidth;
+      layers[nxt].className = 'photo on';
+      layers[cur].className = 'photo';
+    };
+    img.src = url;
+  }
+  function photosWanted() {
+    return document.body.className.indexOf('idle') !== -1 ? $('saver') :
+      document.body.className.indexOf('t-photo') !== -1 ? $('bgPhotos') : null;
+  }
+  setInterval(function () { var c = photosWanted(); if (c) rotate(c); }, PHOTO_MS);
+
+  // ---------- apps ----------
+  function build(apps) {
+    var used = {};
+    FAVS.forEach(function (f) {
+      var found = null;
+      for (var i = 0; i < apps.length; i++) {
+        if (!used[apps[i].id] && contains(apps[i].name, f.match)) { found = apps[i]; break; }
+      }
+      if (found) { used[found.id] = 1; rows[0].push({ name: f.name, color: f.color, ids: [found.id] }); }
+      else if (!hasTizen || !apps.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids });
+    });
+    // Real store apps have numeric ids (3201907018807) or a 10-character package id (xvvl3S1bvH.Name);
+    // everything else (org.tizen.*, com.samsung.*) is a hidden system part like "RM service icon".
+    var rest = apps.filter(function (a) {
+      return !used[a.id] && !contains(a.name, HIDE) && /^(\d{8,}|[A-Za-z0-9]{10}\.\w+)$/.test(a.id);
+    });
+    rest.sort(function (a, b) { return lc(a.name) < lc(b.name) ? -1 : 1; });
+    rest.forEach(function (a, i) {
+      rows[1].push({ name: a.name, color: PALETTE[i % PALETTE.length], ids: [a.id], icon: a.iconPath });
+    });
+    render();
+  }
+
+  function tileEl(t, delay) {
+    var el = document.createElement('div');
+    el.className = 'tile rise';
+    el.style.webkitAnimationDelay = el.style.animationDelay = delay + 's';
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.style.background = 'linear-gradient(145deg, ' + t.color + ' 0%, rgba(0,0,0,.6) 120%)';
+    el.appendChild(card);
+    var label = function () {
+      var n = document.createElement('div'); n.className = 'name';
+      var s = document.createElement('span'); s.textContent = t.name; n.appendChild(s); return n;
+    };
+    if (t.icon) {
+      var img = document.createElement('img');
+      var cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = t.name;
+      img.onerror = function () { card.removeChild(img); card.replaceChild(label(), cap); };
+      img.src = t.icon;
+      card.appendChild(img); card.appendChild(cap);
+    } else {
+      card.appendChild(label());
+    }
+    var g = document.createElement('div'); g.className = 'gloss'; card.appendChild(g);
+    var sw = document.createElement('div'); sw.className = 'sweep'; card.appendChild(sw);
+    return el;
+  }
+
+  function render() {
+    ['row1', 'row2'].forEach(function (id, r) {
+      var row = $(id);
+      row.innerHTML = '';
+      rows[r].forEach(function (t, i) {
+        // stagger only what's on screen; the rest appear at once
+        var d = i < 6 ? (r === 0 ? 0.2 : 0.4) + i * 0.07 : 0;
+        t.el = tileEl(t, d); row.appendChild(t.el);
+      });
+    });
+    if (!rows[1].length) $('l2').style.display = 'none';
+    focus(0, 0);
+  }
+
+  function setHint() {
+    if (pos.r === -1) { $('hint').innerHTML = 'Press OK to change theme \u00B7 <b>' + THEMES[themeIdx][1] + '</b>'; return; }
+    var t = rows[pos.r][pos.c];
+    $('hint').innerHTML = 'Press OK to open <b></b>';
+    $('hint').lastChild.textContent = t.name;
+  }
+
+  function focus(r, c) {
+    var old = pos.r === -1 ? null : rows[pos.r][pos.c];
+    if (old && old.el) old.el.className = 'tile';
+    $('themeBtn').className = '';
+    if (r === -1) { pos = { r: -1, c: 0 }; $('themeBtn').className = 'focus'; setHint(); return; }
+    if (!rows[r].length) return;
+    c = Math.max(0, Math.min(c, rows[r].length - 1));
+    pos = { r: r, c: c };
+    var t = rows[r][c];
+    void t.el.offsetWidth; // restart the sweep animation
+    t.el.className = 'tile focus';
+    var row = $(r === 0 ? 'row1' : 'row2');
+    var w = t.el.offsetWidth + 34, visible = Math.floor((1920 - 192) / w);
+    var shift = Math.max(0, c - visible + 2) * w;
+    row.style.webkitTransform = row.style.transform = 'translateX(' + (-shift) + 'px)';
+    setHint();
+  }
+
+  // Inside TizenBrew the page itself can't open apps, so it asks the dashboard's service (service/service.js).
+  var SVC = 'http://127.0.0.1:8095';
+  function svc(path, ok, fail) {
+    var x = new XMLHttpRequest();
+    x.open('GET', SVC + path, true); x.timeout = 8000;
+    x.onload = function () {
+      var d = null; try { d = JSON.parse(x.responseText); } catch (e) {}
+      if (x.status === 200 && d) ok(d); else fail();
+    };
+    x.onerror = x.ontimeout = fail;
+    x.send();
+  }
+
+  function launch(t) {
+    // TizenTube lives in TizenBrew's own module list, one step back.
+    if (inTizenBrew && t.name === 'TizenTube') { history.back(); return; }
+    if (inTizenBrew && t.ids.length) {
+      toast('Opening ' + t.name + '\u2026');
+      svc('/launch?ids=' + encodeURIComponent(t.ids.join(',')), function () {}, function () { launchHere(t); });
+      return;
+    }
+    launchHere(t);
+  }
+  function launchHere(t) {
+    if (!hasTizen) { toast(location.protocol === 'file:' ? 'Would open ' + t.name : t.name + ' can\'t be opened from inside TizenBrew'); return; }
+    var ids = t.ids.slice();
+    if (!ids.length) { toast(t.name + ' is not installed on this TV'); return; }
+    (function next() {
+      var id = ids.shift();
+      try {
+        toast('Opening ' + t.name + '\u2026');
+        tizen.application.launch(id, function () {}, function () {
+          if (ids.length) next(); else toast('Could not open ' + t.name);
+        });
+      } catch (e) { if (ids.length) next(); else toast('Could not open ' + t.name); }
+    })();
+  }
+
+  // ---------- idle ----------
+  var idleTimer;
+  function wake() {
+    var was = document.body.className.indexOf('idle') !== -1;
+    document.body.className = document.body.className.replace(/\s*idle/g, '');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () { document.body.className += ' idle'; rotate($('saver')); }, IDLE_MS);
+    return was;
+  }
+  wake();
+
+  document.addEventListener('keydown', function (e) {
+    if (wake()) { e.preventDefault(); return; } // first key just wakes the screen
+    switch (e.keyCode) {
+      case 37: if (pos.r >= 0) focus(pos.r, pos.c - 1); break;
+      case 39: if (pos.r >= 0) focus(pos.r, pos.c + 1); break;
+      case 38: if (pos.r === 1) focus(0, Math.round(pos.c * 290 / 380)); else if (pos.r === 0) focus(-1, 0); break;
+      case 40: if (pos.r === -1) focus(0, 0); else if (pos.r === 0 && rows[1].length) focus(1, Math.round(pos.c * 380 / 290)); break;
+      case 13:
+        if (pos.r === -1) { applyTheme(themeIdx + 1, true); setTimeout(setHint, 500); }
+        else launch(rows[pos.r][pos.c]);
+        break;
+      case 10009: // Back
+        if (pos.r !== 0 || pos.c !== 0) { focus(0, 0); break; }
+        // Inside TizenBrew, go back to its module list instead of closing everything.
+        if (inTizenBrew) { history.back(); break; }
+        try { tizen.application.getCurrentApplication().exit(); } catch (err) {}
+        break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  if (inTizenBrew) {
+    build([]);
+    // The service can take a few seconds to start; once it answers, rebuild with the TV's real app list.
+    (function askApps(tries) {
+      svc('/apps', function (apps) {
+        if (!apps.length) return;
+        rows = [[], []]; $('l2').style.display = '';
+        build(apps);
+      }, function () { if (tries > 0) setTimeout(function () { askApps(tries - 1); }, 2000); });
+    })(8);
+  } else if (hasTizen) {
+    try {
+      tizen.application.getAppsInfo(function (list) {
+        var apps = [];
+        list.forEach(function (a) {
+          if (a.show === false || !a.name) return;
+          apps.push({ id: a.id, name: a.name, iconPath: a.iconPath });
+        });
+        build(apps);
+      }, function () { build([]); });
+    } catch (e) { build([]); }
+  } else if (location.protocol !== 'file:') {
+    build([]);
+  } else {
+    // preview outside the TV
+    build([
+      { id: 'tb', name: 'TizenBrew' }, { id: 'nf', name: 'Netflix' }, { id: 'pv', name: 'Prime Video' },
+      { id: 'jh', name: 'JioHotstar' }, { id: 'at', name: 'Apple TV' }, { id: 'aha', name: 'aha' },
+      { id: 'z5', name: 'ZEE5' }, { id: 'yt', name: 'YouTube' }, { id: 'jc', name: 'JioCinema' },
+      { id: 'mx', name: 'MX Player' }, { id: 'tp', name: 'Tata Play Smart' }, { id: 'ott', name: 'OTTplay' },
+      { id: 'am', name: 'Apple Music' }, { id: 'tvp', name: 'Samsung TV Plus' }, { id: 'tune', name: 'Tune Station' }
+    ]);
+  }
+})();
+</script>
+</body>
+</html>
