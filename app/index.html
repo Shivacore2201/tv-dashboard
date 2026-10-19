@@ -360,7 +360,11 @@
       if (found) { used[found.id] = 1; rows[0].push({ name: f.name, color: f.color, ids: [found.id] }); }
       else if (!hasTizen || !apps.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids });
     });
-    var rest = apps.filter(function (a) { return !used[a.id] && !contains(a.name, HIDE); });
+    // Real store apps have numeric ids (3201907018807) or a 10-character package id (xvvl3S1bvH.Name);
+    // everything else (org.tizen.*, com.samsung.*) is a hidden system part like "RM service icon".
+    var rest = apps.filter(function (a) {
+      return !used[a.id] && !contains(a.name, HIDE) && /^(\d{8,}|[A-Za-z0-9]{10}\.\w+)$/.test(a.id);
+    });
     rest.sort(function (a, b) { return lc(a.name) < lc(b.name) ? -1 : 1; });
     rest.forEach(function (a, i) {
       rows[1].push({ name: a.name, color: PALETTE[i % PALETTE.length], ids: [a.id], icon: a.iconPath });
