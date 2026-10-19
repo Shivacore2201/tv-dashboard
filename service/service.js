@@ -3,6 +3,7 @@
 // Plain ES5: TizenBrew's service runs on an old Node.js.
 var http = require('http');
 var url = require('url');
+var fs = require('fs');
 
 function send(res, code, body) {
   res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
@@ -21,6 +22,20 @@ var server = http.createServer(function (req, res) {
   var q = url.parse(req.url, true);
   if (q.pathname === '/ping') return send(res, 200, { ok: true });
   if (q.pathname === '/launch') return launch(String(q.query.ids || '').split(',').filter(Boolean), res);
+  if (q.pathname === '/icon') {
+    // App icons live in the TV's own files, which the dashboard page can't read directly.
+    var file = '';
+    try { file = String(tizen.application.getAppInfo(String(q.query.id)).iconPath || '').replace(/^file:\/\//, ''); } catch (e) {}
+    if (!file) return send(res, 404, { error: 'no icon' });
+    var type = /\.jpe?g$/i.test(file) ? 'image/jpeg' : 'image/png';
+    var stream = fs.createReadStream(file);
+    stream.on('error', function () { send(res, 404, { error: 'no icon' }); });
+    stream.on('open', function () {
+      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'max-age=86400', 'Access-Control-Allow-Origin': '*' });
+      stream.pipe(res);
+    });
+    return;
+  }
   if (q.pathname === '/apps') {
     try {
       return tizen.application.getAppsInfo(function (list) {

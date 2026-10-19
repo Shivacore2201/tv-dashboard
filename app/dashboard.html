@@ -75,11 +75,12 @@
   #wdesc { font-size: 32px; opacity: .75; margin-top: 10px; }
   #wplace { font-size: 26px; opacity: .5; margin-top: 4px; }
 
-  #themeBtn { position: absolute; right: 0; top: 290px; padding: 12px 26px; border-radius: 40px; font-size: 26px; font-weight: 600;
+  #btns { position: absolute; right: 0; top: 290px; white-space: nowrap; }
+  .pill { display: inline-block; margin-left: 18px; padding: 12px 26px; border-radius: 40px; font-size: 26px; font-weight: 600;
     background: rgba(255,255,255,.1); border: 2px solid rgba(255,255,255,.15);
     -webkit-transition: -webkit-transform .25s, background .25s; transition: transform .25s, background .25s; }
-  #themeBtn .dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-right: 12px; vertical-align: -1px; background: var(--accent); }
-  #themeBtn.focus { background: rgba(255,255,255,.95); color: #111; -webkit-transform: scale(1.1); transform: scale(1.1); }
+  .pill .dot { display: inline-block; width: 18px; height: 18px; border-radius: 50%; margin-right: 12px; vertical-align: -1px; background: var(--accent); }
+  .pill.focus { background: rgba(255,255,255,.95); color: #111; -webkit-transform: scale(1.1); transform: scale(1.1); }
 
   /* ---------- rows ---------- */
   .label { position: absolute; left: 96px; font-size: 28px; font-weight: 700; opacity: .55; letter-spacing: 3px; }
@@ -131,6 +132,8 @@
     -webkit-transition: opacity 1.2s; transition: opacity 1.2s; }
   body.idle #saver { opacity: 1; }
   body.idle #ui { opacity: 0; }
+  /* Screensaver started from its button: wallpapers only, no clock or weather. */
+  body.pure #sinfo, body.pure #sweather, body.pure #saverShade { display: none; }
   #saverShade { position: absolute; left: 0; right: 0; bottom: 0; height: 55%;
     background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.7)); }
   #sinfo { position: absolute; left: 96px; bottom: 80px; }
@@ -151,7 +154,7 @@
     <div id="date"></div>
     <div id="greet"></div>
     <div id="weather"><div id="wtemp"></div><div id="wdesc"></div><div id="wrange"></div><div id="wplace"></div></div>
-    <div id="themeBtn"><span class="dot"></span><span id="themeName">Theme</span></div>
+    <div id="btns"><div id="saverBtn" class="pill">&#9654; Screensaver</div><div id="themeBtn" class="pill"><span class="dot"></span><span id="themeName">Theme</span></div></div>
   </div>
 
   <div class="label rise" id="l1" style="-webkit-animation-delay:.15s;animation-delay:.15s">FAVOURITES</div>
@@ -180,7 +183,7 @@
   var FAVS = [
     { match: ['tizentube', 'tizenbrew'], name: 'TizenTube', color: '#e62117', ids: ['xvvl3S1bvH.TizenBrewStandalone'] },
     { match: ['netflix'], name: 'Netflix', color: '#b20710', ids: ['3201907018807', '11101200001'] },
-    { match: ['prime video', 'amazon'], name: 'Prime Video', color: '#00a8e1', ids: ['3201910019365', '3201512006785'] },
+    { match: ['prime video'], name: 'Prime Video', color: '#00a8e1', ids: [] },
     { match: ['jiohotstar', 'hotstar'], name: 'JioHotstar', color: '#2b3bbf', ids: [] },
     { match: ['apple tv'], name: 'Apple TV', color: '#3a3a3c', ids: ['3201807016597'] },
     { match: ['aha'], name: 'aha', color: '#f26a21', ids: [] },
@@ -332,6 +335,16 @@
     x.send();
   }
   // Bing's photo of the day archive: free, no account, about 16 recent pictures.
+  // Your own photos: anything uploaded to the wallpapers folder of the GitHub repo comes first.
+  var mine = [];
+  function loadMine() {
+    getJSON('https://api.github.com/repos/Shivacore2201/tv-dashboard/contents/wallpapers', function (list) {
+      if (!list || !list.length) return;
+      var out = [];
+      list.forEach(function (f) { if (/\.(jpe?g|png|webp)$/i.test(f.name) && f.download_url) out.push(f.download_url); });
+      mine = out;
+    });
+  }
   var bing = [];
   function loadBing() {
     [0, 8].forEach(function (idx) {
@@ -344,10 +357,11 @@
       });
     });
   }
-  loadPins(); loadBing();
-  setInterval(function () { loadPins(); loadBing(); }, 6 * 60 * 60 * 1000);
+  loadMine(); loadPins(); loadBing();
+  setInterval(function () { loadMine(); loadPins(); loadBing(); }, 6 * 60 * 60 * 1000);
   function nextPhotoUrl() {
     photoN++;
+    if (mine.length) return mine[photoN % mine.length];
     if (pins.length) return pins[photoN % pins.length];
     if (bing.length) return bing[Math.floor(Math.random() * bing.length)];
     return 'https://picsum.photos/1920/1080?random=' + Date.now() + photoN;
@@ -379,20 +393,24 @@
   setInterval(function () { var c = photosWanted(); if (c) rotate(c); }, PHOTO_MS);
 
   // ---------- apps ----------
+  var STORE_ID = /^(\d{8,}|[A-Za-z0-9]{10}\.\w+)$/;
   function build(apps) {
     var used = {};
     FAVS.forEach(function (f) {
+      // Try each name in order, so "Prime Video" can't land on a built-in like Alexa or Bixby.
       var found = null;
-      for (var i = 0; i < apps.length; i++) {
-        if (!used[apps[i].id] && contains(apps[i].name, f.match)) { found = apps[i]; break; }
+      for (var m = 0; m < f.match.length && !found; m++) {
+        for (var i = 0; i < apps.length; i++) {
+          if (!used[apps[i].id] && STORE_ID.test(apps[i].id) && contains(apps[i].name, [f.match[m]])) { found = apps[i]; break; }
+        }
       }
-      if (found) { used[found.id] = 1; rows[0].push({ name: f.name, color: f.color, ids: [found.id] }); }
-      else if (!hasTizen || !apps.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids });
+      if (found) { used[found.id] = 1; rows[0].push({ name: f.name, color: f.color, ids: [found.id], icon: found.iconPath }); }
+      else if (!apps.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids });
     });
     // Real store apps have numeric ids (3201907018807) or a 10-character package id (xvvl3S1bvH.Name);
     // everything else (org.tizen.*, com.samsung.*) is a hidden system part like "RM service icon".
     var rest = apps.filter(function (a) {
-      return !used[a.id] && !contains(a.name, HIDE) && /^(\d{8,}|[A-Za-z0-9]{10}\.\w+)$/.test(a.id);
+      return !used[a.id] && !contains(a.name, HIDE) && STORE_ID.test(a.id);
     });
     rest.sort(function (a, b) { return lc(a.name) < lc(b.name) ? -1 : 1; });
     rest.forEach(function (a, i) {
@@ -442,6 +460,7 @@
   }
 
   function setHint() {
+    if (pos.r === -1 && pos.c === 0) { $('hint').innerHTML = 'Press OK to show only the wallpapers \u00B7 any button brings you back'; return; }
     if (pos.r === -1) { $('hint').innerHTML = 'Press OK to change theme \u00B7 <b>' + THEMES[themeIdx][1] + '</b>'; return; }
     var t = rows[pos.r][pos.c];
     $('hint').innerHTML = 'Press OK to open <b></b>';
@@ -451,8 +470,8 @@
   function focus(r, c) {
     var old = pos.r === -1 ? null : rows[pos.r][pos.c];
     if (old && old.el) old.el.className = 'tile';
-    $('themeBtn').className = '';
-    if (r === -1) { pos = { r: -1, c: 0 }; $('themeBtn').className = 'focus'; setHint(); return; }
+    $('saverBtn').className = $('themeBtn').className = 'pill';
+    if (r === -1) { c = Math.max(0, Math.min(1, c)); pos = { r: -1, c: c }; $(c ? 'themeBtn' : 'saverBtn').className = 'pill focus'; setHint(); return; }
     if (!rows[r].length) return;
     c = Math.max(0, Math.min(c, rows[r].length - 1));
     pos = { r: r, c: c };
@@ -508,21 +527,27 @@
   var idleTimer;
   function wake() {
     var was = document.body.className.indexOf('idle') !== -1;
-    document.body.className = document.body.className.replace(/\s*idle/g, '');
+    document.body.className = document.body.className.replace(/\s*(idle|pure)\b/g, '');
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(function () { document.body.className += ' idle'; rotate($('saver')); }, IDLE_MS);
+    idleTimer = setTimeout(function () { startSaver(false); }, IDLE_MS);
     return was;
+  }
+  function startSaver(pure) {
+    clearTimeout(idleTimer);
+    document.body.className += pure ? ' idle pure' : ' idle';
+    rotate($('saver'));
   }
   wake();
 
   document.addEventListener('keydown', function (e) {
     if (wake()) { e.preventDefault(); return; } // first key just wakes the screen
     switch (e.keyCode) {
-      case 37: if (pos.r >= 0) focus(pos.r, pos.c - 1); break;
-      case 39: if (pos.r >= 0) focus(pos.r, pos.c + 1); break;
-      case 38: if (pos.r === 1) focus(0, Math.round(pos.c * 290 / 380)); else if (pos.r === 0) focus(-1, 0); break;
+      case 37: focus(pos.r, pos.c - 1); break;
+      case 39: focus(pos.r, pos.c + 1); break;
+      case 38: if (pos.r === 1) focus(0, Math.round(pos.c * 290 / 380)); else if (pos.r === 0) focus(-1, 1); break;
       case 40: if (pos.r === -1) focus(0, 0); else if (pos.r === 0 && rows[1].length) focus(1, Math.round(pos.c * 380 / 290)); break;
       case 13:
+        if (pos.r === -1 && pos.c === 0) { startSaver(true); break; }
         if (pos.r === -1) { applyTheme(themeIdx + 1, true); setTimeout(setHint, 500); }
         else launch(rows[pos.r][pos.c]);
         break;
@@ -544,6 +569,7 @@
       svc('/apps', function (apps) {
         if (!apps.length) return;
         rows = [[], []]; $('l2').style.display = '';
+        apps.forEach(function (a) { a.iconPath = SVC + '/icon?id=' + encodeURIComponent(a.id); });
         build(apps);
       }, function () { if (tries > 0) setTimeout(function () { askApps(tries - 1); }, 2000); });
     })(8);

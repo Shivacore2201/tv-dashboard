@@ -1,6 +1,6 @@
 {
   "name": "tv-dashboard",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "An Apple TV-style home dashboard for Samsung Tizen TVs: clock, weather, themes, app shortcuts and a photo screensaver.",
   "packageType": "app",
   "appName": "Dashboard",
