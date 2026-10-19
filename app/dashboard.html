@@ -467,19 +467,24 @@
   function build(apps) {
     var used = {};
     FAVS.forEach(function (f) {
-      // Try each name in order, so "Prime Video" can't land on a built-in like Alexa or Bixby,
-      // and prefer a real app over a preinstalled placeholder with the same name.
-      var found = null;
-      for (var m = 0; m < f.match.length && !found; m++) {
+      // Collect every app on the TV with this name (some TVs carry two, like a placeholder and the
+      // real one). The tile tries them in turn: real apps first, then known store ids, placeholders last.
+      var real = [], dummies = [];
+      for (var m = 0; m < f.match.length; m++) {
         for (var i = 0; i < apps.length; i++) {
-          if (used[apps[i].id] || isSystem(apps[i]) || !contains(apps[i].name, [f.match[m]])) continue;
-          if (!found || /dummy/i.test(found.id)) found = apps[i];
+          var a = apps[i];
+          if (used[a.id] || isSystem(a) || !contains(a.name, [f.match[m]])) continue;
+          used[a.id] = 1;
+          (/dummy/i.test(a.id) ? dummies : real).push(a);
         }
       }
+      var found = real[0] || dummies[0];
       if (found) {
-        used[found.id] = 1;
-        // A preinstalled placeholder ("...-dummy") can't play anything, so try the real app's known id first.
-        var ids = /dummy/i.test(found.id) ? f.ids.concat([found.id]) : [found.id].concat(f.ids);
+        var ids = [];
+        real.concat({ id: null }).concat(dummies).forEach(function (a) {
+          if (a.id === null) { f.ids.forEach(function (x) { if (ids.indexOf(x) === -1) ids.push(x); }); }
+          else if (ids.indexOf(a.id) === -1) ids.push(a.id);
+        });
         rows[0].push({ name: f.name, color: f.color, ids: ids, icon: found.iconPath });
       }
       else if (!apps.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids });
@@ -625,7 +630,7 @@
     if (inTizenBrew && t.ids.length) {
       toast('Opening ' + t.name + '\u2026');
       svc('/launch?ids=' + encodeURIComponent(t.ids.join(',')), function () {}, function () {
-        if (hasTizen) launchHere(t); else toast(t.name + ' didn\'t open. It may not be installed on this TV.');
+        if (hasTizen) launchHere(t); else toast(t.name + ' didn\'t open (tried ' + t.ids.join(', ') + ')');
       });
       return;
     }
@@ -660,7 +665,7 @@
     toast('Open TizenBrew from Home and press UP while it starts to reach its menu');
   }
   function launchHere(t) {
-    if (!hasTizen) { toast(location.protocol === 'file:' ? 'Would open ' + t.name : t.name + ' can\'t be opened from inside TizenBrew'); return; }
+    if (!hasTizen) { toast(location.protocol === 'file:' ? 'Would open ' + t.name : t.name + ' isn\'t installed on this TV'); return; }
     var ids = t.ids.slice();
     if (!ids.length) { toast(t.name + ' is not installed on this TV'); return; }
     (function next() {
