@@ -218,14 +218,16 @@
       document.body.className = document.body.className.replace(/\bt-\w+\b/g, '').trim();
       if (THEMES[themeIdx][0]) document.body.className += ' ' + THEMES[themeIdx][0];
       $('themeName').textContent = THEMES[themeIdx][1];
-      store('theme', String(themeIdx));
+      store('theme2', String(themeIdx));
       if (THEMES[themeIdx][0] === 't-photo') setTimeout(function () { rotate($('bgPhotos')); }, 0);
     };
     if (!animate) return set();
     $('bg').className = 'fade';
     setTimeout(function () { set(); $('bg').className = ''; }, 450);
   }
-  applyTheme(parseInt(store('theme'), 10) || 0, false);
+  // Photo wallpapers are the default look; any theme picked with the button is remembered.
+  var savedTheme = store('theme2');
+  applyTheme(savedTheme ? parseInt(savedTheme, 10) || 0 : THEMES.length - 1, false);
 
   // ---------- clock ----------
   var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -312,6 +314,12 @@
   function rotate(container) {
     var layers = container.getElementsByClassName('photo');
     var url = nextPhotoUrl(), img = new Image();
+    // If a picture fails to load, fall back to a random free photo instead of leaving the screen blank.
+    img.onerror = function () {
+      if (url.indexOf('picsum.photos') !== -1) return;
+      url = 'https://picsum.photos/1920/1080?random=' + Date.now();
+      img.src = url;
+    };
     img.onload = function () {
       var cur = layers[0].className.indexOf('on') !== -1 ? 0 : 1, nxt = 1 - cur;
       layers[nxt].style.backgroundImage = 'url("' + url + '")';
@@ -421,6 +429,7 @@
     (function next() {
       var id = ids.shift();
       try {
+        toast('Opening ' + t.name + '\u2026');
         tizen.application.launch(id, function () {}, function () {
           if (ids.length) next(); else toast('Could not open ' + t.name);
         });
@@ -452,6 +461,8 @@
         break;
       case 10009: // Back
         if (pos.r !== 0 || pos.c !== 0) { focus(0, 0); break; }
+        // Inside TizenBrew, go back to its module list instead of closing everything.
+        if (inTizenBrew) { history.back(); break; }
         try { tizen.application.getCurrentApplication().exit(); } catch (err) {}
         break;
       default: return;
