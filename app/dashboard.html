@@ -50,14 +50,10 @@
   @keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.12) translate(-1%, -1%); } }
   #bgPhotos { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; }
   body.t-photo #bgPhotos { display: block; }
-  /* Frosted-glass shelf behind the apps. The TV's browser has no backdrop blur, so it's a blurred copy of the wallpaper. */
-  #glass { position: absolute; left: 0; right: 0; bottom: 0; height: 700px; overflow: hidden; display: none;
-    border-top: 1px solid rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+  /* Smoked-glass shelf behind the apps. The TV's browser can't blur what's behind it, so this is a soft tint that fades in. */
+  #glass { position: absolute; left: 0; right: 0; bottom: 0; height: 720px; display: none;
+    background: linear-gradient(180deg, rgba(10,12,20,0) 0%, rgba(10,12,20,.45) 18%, rgba(10,12,20,.62) 100%); }
   body.t-photo #glass { display: block; }
-  #glassImg { position: absolute; left: -60px; right: -60px; bottom: -60px; height: 1200px; background-size: cover; background-position: center;
-    -webkit-filter: blur(40px) saturate(1.4) brightness(.7); filter: blur(40px) saturate(1.4) brightness(.7);
-    -webkit-transition: opacity 1.2s; transition: opacity 1.2s; }
-  #glassTint { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(0,0,0,.25)); }
   body.t-photo .blob { display: none; }
   body.t-photo #vignette { background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 35%, rgba(0,0,0,.75) 100%); }
   #vignette { position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -116,7 +112,7 @@
   #r2 .name span { font-size: 32px; }
   .card img { position: absolute; left: 50%; top: 46%; width: 96px; height: 96px; margin: -48px 0 0 -48px; }
   .cap { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 22px; font-weight: 600; }
-  .art { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; }
+  .art { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
   .under { position: absolute; left: 0; right: 0; top: 100%; margin-top: 22px; text-align: center; font-size: 26px; font-weight: 600;
     opacity: 0; -webkit-transition: opacity .3s; transition: opacity .3s; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
   #r2 .under { font-size: 22px; margin-top: 16px; }
@@ -132,6 +128,7 @@
   @keyframes sweep { 0% { opacity: 1; transform: translateX(-120%) skewX(-15deg); } 100% { opacity: 1; transform: translateX(320%) skewX(-15deg); } }
 
   #hint { position: absolute; left: 96px; bottom: 34px; font-size: 26px; opacity: .55; }
+  #hint i { font-style: normal; font-size: 20px; opacity: .45; white-space: pre; }
   #hint b { color: var(--accent); font-weight: 600; opacity: 1; }
 
   #toast { position: absolute; left: 50%; bottom: 40px; width: 900px; margin-left: -450px; text-align: center;
@@ -159,7 +156,7 @@
 </head>
 <body>
 <div id="stage">
-<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div id="bgPhotos"><div class="photo"></div><div class="photo"></div></div><div id="vignette"></div><div id="glass"><div id="glassImg"></div><div id="glassTint"></div></div></div>
+<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div id="bgPhotos"><div class="photo"></div><div class="photo"></div></div><div id="vignette"></div><div id="glass"></div></div>
 
 <div id="ui">
   <div id="top" class="rise">
@@ -206,8 +203,11 @@
   ];
   var PALETTE = ['#3a5bd9', '#8a3ad9', '#1aa6b7', '#d9573a', '#2f9e5b', '#c23a7a', '#5a6b8c', '#b7891a'];
   // Hidden Samsung system parts that show up in the TV's app list.
-  var SYSTEM = ['widget', 'popup', 'service icon', 'adplayer', 'agingapp', 'survey'];
-  function isSystem(a) { return /^(org\.tizen|com\.samsung)\./i.test(a.id) || contains(a.name, SYSTEM); }
+  var SYSTEM = ['widget', 'popup', 'service', 'adplayer', 'agingapp', 'survey', 'framework', 'aria video', 'bixby', 'alexa'];
+  function isSystem(a) {
+    // Names like "bnr-service" or "csfw_agent" are internal parts, not apps people open.
+    return contains(a.name, SYSTEM) || /^[a-z0-9]+([-_.][a-z0-9]+)+$/.test(a.name || '');
+  }
   var HIDE = ['tizentube', 'web browser', 'internet', 'gallery', 'samsung promotion', 'universal guide', 'dashboard', 'e-manual', 'smartthings'];
   var THEMES = [['', 'Midnight'], ['t-aurora', 'Aurora'], ['t-sunset', 'Sunset'], ['t-ocean', 'Ocean'], ['t-gold', 'Gold'], ['t-mono', 'Mono'], ['t-photo', 'Photo']];
   var IDLE_MS = 3 * 60 * 1000;
@@ -399,10 +399,6 @@
       void layers[nxt].offsetWidth;
       layers[nxt].className = 'photo on';
       layers[cur].className = 'photo';
-      if (container.id === 'bgPhotos') {
-        var g = $('glassImg'); g.style.opacity = 0;
-        setTimeout(function () { g.style.backgroundImage = 'url("' + url + '")'; g.style.opacity = 1; }, 600);
-      }
     };
     img.src = url;
   }
@@ -491,8 +487,9 @@
     if (pos.r === -1 && pos.c === 0) { $('hint').innerHTML = 'Press OK to show only the wallpapers \u00B7 any button brings you back'; return; }
     if (pos.r === -1) { $('hint').innerHTML = 'Press OK to change theme \u00B7 <b>' + THEMES[themeIdx][1] + '</b>'; return; }
     var t = rows[pos.r][pos.c];
-    $('hint').innerHTML = 'Press OK to open <b></b>';
-    $('hint').lastChild.textContent = t.name;
+    $('hint').innerHTML = 'Press OK to open <b></b><i></i>';
+    $('hint').childNodes[1].textContent = t.name;
+    $('hint').lastChild.textContent = t.ids.length ? '   ' + t.ids[0] : '';
   }
 
   function focus(r, c) {
