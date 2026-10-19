@@ -50,6 +50,14 @@
   @keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.12) translate(-1%, -1%); } }
   #bgPhotos { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; }
   body.t-photo #bgPhotos { display: block; }
+  /* Frosted-glass shelf behind the apps. The TV's browser has no backdrop blur, so it's a blurred copy of the wallpaper. */
+  #glass { position: absolute; left: 0; right: 0; bottom: 0; height: 700px; overflow: hidden; display: none;
+    border-top: 1px solid rgba(255,255,255,.18); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+  body.t-photo #glass { display: block; }
+  #glassImg { position: absolute; left: -60px; right: -60px; bottom: -60px; height: 1200px; background-size: cover; background-position: center;
+    -webkit-filter: blur(40px) saturate(1.4) brightness(.7); filter: blur(40px) saturate(1.4) brightness(.7);
+    -webkit-transition: opacity 1.2s; transition: opacity 1.2s; }
+  #glassTint { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(0,0,0,.25)); }
   body.t-photo .blob { display: none; }
   body.t-photo #vignette { background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 35%, rgba(0,0,0,.75) 100%); }
   #vignette { position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -108,6 +116,11 @@
   #r2 .name span { font-size: 32px; }
   .card img { position: absolute; left: 50%; top: 46%; width: 96px; height: 96px; margin: -48px 0 0 -48px; }
   .cap { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 22px; font-weight: 600; }
+  .art { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-size: cover; background-position: center; }
+  .under { position: absolute; left: 0; right: 0; top: 100%; margin-top: 22px; text-align: center; font-size: 26px; font-weight: 600;
+    opacity: 0; -webkit-transition: opacity .3s; transition: opacity .3s; text-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  #r2 .under { font-size: 22px; margin-top: 16px; }
+  .tile.focus .under { opacity: 1; }
   .gloss { position: absolute; left: 0; right: 0; top: 0; height: 55%;
     background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,0)); }
   /* light sweep across the card when it gets focus */
@@ -146,7 +159,7 @@
 </head>
 <body>
 <div id="stage">
-<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div id="bgPhotos"><div class="photo"></div><div class="photo"></div></div><div id="vignette"></div></div>
+<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div id="bgPhotos"><div class="photo"></div><div class="photo"></div></div><div id="vignette"></div><div id="glass"><div id="glassImg"></div><div id="glassTint"></div></div></div>
 
 <div id="ui">
   <div id="top" class="rise">
@@ -192,6 +205,9 @@
     { match: ['youtube'], name: 'YouTube', color: '#cc0000', ids: ['111299001912'] }
   ];
   var PALETTE = ['#3a5bd9', '#8a3ad9', '#1aa6b7', '#d9573a', '#2f9e5b', '#c23a7a', '#5a6b8c', '#b7891a'];
+  // Hidden Samsung system parts that show up in the TV's app list.
+  var SYSTEM = ['widget', 'popup', 'service icon', 'adplayer', 'agingapp', 'survey'];
+  function isSystem(a) { return /^(org\.tizen|com\.samsung)\./i.test(a.id) || contains(a.name, SYSTEM); }
   var HIDE = ['tizentube', 'web browser', 'internet', 'gallery', 'samsung promotion', 'universal guide', 'dashboard', 'e-manual', 'smartthings'];
   var THEMES = [['', 'Midnight'], ['t-aurora', 'Aurora'], ['t-sunset', 'Sunset'], ['t-ocean', 'Ocean'], ['t-gold', 'Gold'], ['t-mono', 'Mono'], ['t-photo', 'Photo']];
   var IDLE_MS = 3 * 60 * 1000;
@@ -383,6 +399,10 @@
       void layers[nxt].offsetWidth;
       layers[nxt].className = 'photo on';
       layers[cur].className = 'photo';
+      if (container.id === 'bgPhotos') {
+        var g = $('glassImg'); g.style.opacity = 0;
+        setTimeout(function () { g.style.backgroundImage = 'url("' + url + '")'; g.style.opacity = 1; }, 600);
+      }
     };
     img.src = url;
   }
@@ -393,7 +413,6 @@
   setInterval(function () { var c = photosWanted(); if (c) rotate(c); }, PHOTO_MS);
 
   // ---------- apps ----------
-  var STORE_ID = /^(\d{8,}|[A-Za-z0-9]{10}\.\w+)$/;
   function build(apps) {
     var used = {};
     FAVS.forEach(function (f) {
@@ -401,16 +420,19 @@
       var found = null;
       for (var m = 0; m < f.match.length && !found; m++) {
         for (var i = 0; i < apps.length; i++) {
-          if (!used[apps[i].id] && STORE_ID.test(apps[i].id) && contains(apps[i].name, [f.match[m]])) { found = apps[i]; break; }
+          if (!used[apps[i].id] && !isSystem(apps[i]) && contains(apps[i].name, [f.match[m]])) { found = apps[i]; break; }
         }
       }
       if (found) { used[found.id] = 1; rows[0].push({ name: f.name, color: f.color, ids: [found.id], icon: found.iconPath }); }
       else if (!apps.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids });
     });
-    // Real store apps have numeric ids (3201907018807) or a 10-character package id (xvvl3S1bvH.Name);
-    // everything else (org.tizen.*, com.samsung.*) is a hidden system part like "RM service icon".
+    // If none of the favourites matched by name, keep the built-in list rather than an empty row.
+    if (apps.length && rows[0].length <= 1) {
+      rows[0] = [];
+      FAVS.forEach(function (f) { if (f.ids.length) rows[0].push({ name: f.name, color: f.color, ids: f.ids }); });
+    }
     var rest = apps.filter(function (a) {
-      return !used[a.id] && !contains(a.name, HIDE) && STORE_ID.test(a.id);
+      return !used[a.id] && !contains(a.name, HIDE) && !isSystem(a);
     });
     rest.sort(function (a, b) { return lc(a.name) < lc(b.name) ? -1 : 1; });
     rest.forEach(function (a, i) {
@@ -431,14 +453,20 @@
       var n = document.createElement('div'); n.className = 'name';
       var s = document.createElement('span'); s.textContent = t.name; n.appendChild(s); return n;
     };
+    // Name first; if the app's own artwork loads, it covers the card like on Apple TV.
+    card.appendChild(label());
     if (t.icon) {
-      var img = document.createElement('img');
-      var cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = t.name;
-      img.onerror = function () { card.removeChild(img); card.replaceChild(label(), cap); };
+      var img = new Image();
+      img.onload = function () {
+        var art = document.createElement('div'); art.className = 'art';
+        art.style.backgroundImage = 'url("' + t.icon + '")';
+        // Wide artwork fills the card; square logos sit centred on the coloured card instead of being cropped.
+        if (img.naturalWidth / img.naturalHeight < 1.4) art.style.backgroundSize = 'auto 62%';
+        card.insertBefore(art, card.firstChild.nextSibling);
+        card.removeChild(card.firstChild);
+        var u = document.createElement('div'); u.className = 'under'; u.textContent = t.name; el.appendChild(u);
+      };
       img.src = t.icon;
-      card.appendChild(img); card.appendChild(cap);
-    } else {
-      card.appendChild(label());
     }
     var g = document.createElement('div'); g.className = 'gloss'; card.appendChild(g);
     var sw = document.createElement('div'); sw.className = 'sweep'; card.appendChild(sw);
